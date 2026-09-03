@@ -36,9 +36,11 @@ import { env } from "../env";
 // clients already opt out of. translator is a genuinely different eTLD+1
 // (cross-SITE, not just cross-subdomain), so its cookie can never arrive
 // here regardless of credentials mode — its events land anonymous by
-// construction, not by a bug.
+// construction, not by a bug. mermaid has no account system at all, so its
+// events are anonymous for the simpler reason that there is no cookie to
+// ever consider sending.
 //
-// One shared endpoint serving three origins needs to know which site/app
+// One shared endpoint serving five origins needs to know which site/app
 // each request is for, and must reflect back only a known origin in CORS
 // (not a wildcard — Access-Control-Allow-Credentials forbids that anyway).
 // Both come from this same fixed table rather than a client-supplied field:
@@ -50,6 +52,8 @@ const ORIGIN_TABLE: Record<string, { site: string; app: string }> = {
   "https://dashboard.iq-rest.com": { site: "iq-rest", app: "dashboard-web" },
   "https://iq-translate.com": { site: "iq-translate", app: "web" },
   "https://www.iq-translate.com": { site: "iq-translate", app: "web" },
+  "https://iq-mermaid.com": { site: "iq-mermaid", app: "web" },
+  "https://www.iq-mermaid.com": { site: "iq-mermaid", app: "web" },
 };
 const EMAIL_COOKIE = "iqr_email";
 

@@ -27,6 +27,11 @@ const sites = [
       topicId: { label: "Topic" },
     },
   },
+  {
+    id: "iq-mermaid",
+    domain: "iq-mermaid.com",
+    metaKeys: {},
+  },
 ] as const;
 
 async function main(): Promise<void> {
