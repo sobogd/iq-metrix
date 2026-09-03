@@ -1,0 +1,123 @@
+generator client {
+  provider      = "prisma-client-js"
+  // Matches translator's prod target: the shared VPS this will deploy
+  // alongside is ARM64.
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// One row per source product. "iq-rest" | "iq-translate" today; any future
+// product wires in by inserting a row here, nothing else needs to change.
+model Site {
+  id        String   @id // slug, e.g. "iq-rest" | "iq-translate"
+  domain    String
+  // Registry of allowed event/visit metadata keys, e.g.
+  // { "restaurantId": { "label": "Restaurant", "link": "https://dashboard.iq-rest.com/dashboard/settings/admin/restaurants/{v}" } }
+  // The ingest sanitizer keeps only keys present here — see src/lib/meta-sanitizer.ts.
+  metaKeys  Json
+  createdAt DateTime @default(now())
+}
+
+// Singleton-per-site row (id = "current") holding the active hash salt.
+// Rotated daily at 04:00 Europe/Madrid; the previous salt is destroyed by the
+// overwrite, which is what makes yesterday's hashes permanently unlinkable.
+model AnalyticsSalt {
+  siteId    String
+  id        String // "current"
+  value     String
+  rotatedAt DateTime
+
+  @@id([siteId, id])
+}
+
+// One row = one VISIT: a device hash plus an identity, cut after 30 minutes of
+// silence. Device/geo/source attribution lives here so event rows stay
+// minimal. Ported from iq-rest/translator's analytics-v2 pipeline, made
+// multi-tenant (siteId) and collapsed to a single `email` identity field plus
+// a generic `meta` bag instead of a hardcoded restaurantId/topicId.
+model Visit {
+  id       String @id @default(cuid())
+  siteId   String
+  // Dedup key of one visit: sha256(hash | email ?? "" | start-minute). The raw
+  // `hash` cannot be unique — two signed-out people behind one NAT with the
+  // same UA share it and must not share a visit row once one of them signs
+  // in, and the same device starts a NEW visit after 30 minutes of silence.
+  // The start-minute bucket makes two racing "start a visit" requests
+  // converge on one row instead of inserting two. Scoped by siteId because
+  // the same hash can legitimately occur on two different sites at once.
+  visitKey String
+  hash     String
+
+  firstAt DateTime @default(now())
+  lastAt  DateTime @default(now())
+
+  device String? // 'mobile' | 'tablet' | 'desktop'
+  os     String? // 'ios' | 'android' | 'windows' | 'macos' | 'linux' | 'other'
+  country String @default("XX")
+  region  String @default("")
+  city    String @default("")
+  lang    String? // full Accept-Language primary tag, e.g. "es-ES"
+  theme   String? // 'dark' | 'light' — prefers-color-scheme, first-write-wins
+  from    String? // ?from= campaign tag, first-write-wins
+  ref     String? // first-touch referrer host
+
+  // Identity of the visit. The ONLY identity key across both products —
+  // unlike iq-rest's userId/restaurantId split or translator's email + topic,
+  // this service only ever knows a verified email address.
+  email String?
+  // Free-form sub-app label within the site, e.g. "landing" | "dashboard" |
+  // "web" — which part of the product the visit happened in.
+  app   String?
+  // Denormalized latest values of custom per-site fields (restaurantId,
+  // topicId, plan, ...), updated on every ingest call from the latest
+  // event(s) so the visit list can filter/show it without joining events.
+  // Validated against Site.metaKeys before being accepted — see
+  // src/lib/meta-sanitizer.ts. A GIN index (jsonb_path_ops) plus a btree
+  // index on the ->>'restaurantId' expression are added by hand in the
+  // initial migration — Prisma cannot express either in the schema.
+  meta Json @default("{}")
+
+  // How many anonymous rows were folded into this one (same device signed
+  // out and back in within a salt-day).
+  mergeCount Int @default(0)
+
+  events Event[]
+
+  @@unique([siteId, visitKey])
+  @@index([siteId, firstAt])
+  @@index([siteId, email])
+  // Ingest looks up the LIVE visit for a device hash (lastAt inside the
+  // 30-min idle window), so the timestamp belongs in the index.
+  @@index([siteId, hash, lastAt])
+  // The admin list sorts a recent window by lastAt.
+  @@index([siteId, lastAt])
+}
+
+// Everything about the device/geo/source lives on the visit; the event row
+// carries only what can change between two events of the same visit.
+model Event {
+  id      String @id @default(cuid())
+  visitId String
+
+  page   String // "Home", "Pricing", "Dashboard", …
+  action String // "Show" | "Click" | "Register" | …
+  name   String // "Pageview", "Header sign in", …
+
+  locale String? // locale the page was rendered in, e.g. "es"
+  app    String? // sub-app the event happened in — the owner can switch mid-visit
+  // Per-event metadata — the source of truth (an owner can switch restaurant
+  // mid-visit); Visit.meta is only a denormalized snapshot of the latest.
+  meta   Json    @default("{}")
+
+  at DateTime @default(now())
+
+  visit Visit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+
+  @@index([visitId, at])
+  @@index([page, action, at])
+  @@index([at])
+}

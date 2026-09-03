@@ -1,0 +1,74 @@
+name: Deploy to Prod (release)
+
+# Mirrors the push->release pattern used by translator/transcribe/money in
+# this workspace. File only for now: nothing points at this service yet
+# (see README), and pushing is deliberately left for a later task, so this
+# workflow has never actually run.
+
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Stack decision for this service is Node 22 (see README) — the
+          # other sibling services in this workspace build on Node 20, but
+          # this one intentionally does not match that part of the pattern.
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Copy build to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: deployer
+          key: ${{ secrets.SSH_KEY }}
+          # public/ ships too: dist/server.js serves style.css from ../public
+          # relative to itself (see src/server.ts) — it is not copied into
+          # dist/ by the TypeScript build.
+          source: "dist/,package.json,package-lock.json,prisma/,public/,ecosystem.config.js"
+          target: "/home/deploy/apps/iq-metrix"
+          overwrite: true
+
+      - name: Setup and restart on VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: deployer
+          key: ${{ secrets.SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            export PATH=$PATH:/usr/bin:/usr/local/bin:/home/deployer/.npm-global/bin
+            cd /home/deploy/apps/iq-metrix
+
+            cat > .env <<ENVEOF
+            DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            INGEST_SHARED_SECRET="${{ secrets.INGEST_SHARED_SECRET }}"
+            ADMIN_USER="${{ secrets.ADMIN_USER }}"
+            ADMIN_PASSWORD_HASH="${{ secrets.ADMIN_PASSWORD_HASH }}"
+            SESSION_SECRET="${{ secrets.SESSION_SECRET }}"
+            PORT="8205"
+            ENVEOF
+
+            npm ci --production
+            npx prisma migrate deploy
+            npx prisma generate
+            PORT=8205 pm2 restart iq-metrix --update-env || pm2 start ecosystem.config.js
+            pm2 save
