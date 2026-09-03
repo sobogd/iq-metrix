@@ -21,10 +21,12 @@ is this route's only protection until then.
 
 ## Scope of what's built so far
 
-Data layer, `/ingest`, admin login, the visit-list/detail admin UI, and a
-seed script for the two real sites. Nothing outside this repo points here
-yet — wiring iq-rest/translator to actually call `/ingest` is a separate,
-later task.
+Data layer, `/ingest`, admin login, the visit-list/detail admin UI, a seed
+script for the two real sites, and a one-time history-import script from
+iq-rest's and translator's own analytics tables. Nothing outside this repo
+points here yet — wiring iq-rest/translator to actually call `/ingest`, and
+running the import against their PROD databases, are both separate, later
+tasks.
 
 ## Running locally
 
@@ -179,6 +181,31 @@ or over time), so one consistent accent hue with no legend is correct per
 the dataviz color-by-job rule; a multi-series chart would need the
 categorical palette instead. Every bar carries a native SVG `<title>` for a
 zero-JS hover tooltip.
+
+## History import
+
+`scripts/import-history.ts` — one-time backfill from iq-rest's/translator's
+own `sessions_new`/`events_new` tables into this service's `Visit`/`Event`.
+Standalone: run via `npx tsx scripts/import-history.ts --site=iq-rest` (or
+`--site=iq-translate`), not part of the server, not wired into any npm
+script or CI. Reads the source DB with a plain `pg` client and raw SQL
+against its known table shape — deliberately does not import either
+product's own Prisma client/schema.
+
+Idempotent: reuses the source row's own `id` and `visitKey` verbatim, so a
+rerun's `createMany({ skipDuplicates: true })` silently no-ops on every row
+already imported (verified locally — rerunning after a full import inserted
+0 further rows). Source DB defaults to each product's local dev database;
+override with `SOURCE_DATABASE_URL` (this is what a future prod cutover run
+would set — not done as part of this task, and the defaults baked in here
+are explicitly local-dev-only, never a prod connection string).
+
+Verified against both products' actual local dev databases: imported 10/10
+visits and 322/322 events from iq-rest, 5/5 visits and 135/135 events from
+translator, spot-checked the mapped rows (including a `theme` value and the
+per-event `restaurantId`/`topicId` -> `meta` mapping) against the source
+data, and confirmed the query layer's meta filter actually uses
+`Visit_meta_restaurantId_idx` via `EXPLAIN`.
 
 ## Deploy
 
