@@ -13,7 +13,7 @@ Stack: Node 22, TypeScript, Fastify, Prisma, Postgres. Server-rendered HTML
 via plain template functions — no React/Next/build step/UI framework. One
 CSS file. pm2 in production.
 
-Intended prod: port `8205`, domain `iq-analytics.iq-rest.com`. DNS / nginx /
+Intended prod: port `8205`, domain `iq-metrix.iq-rest.com`. DNS / nginx /
 certbot for that domain are out of scope here and done separately — see the
 comment in `src/routes/ingest.ts` about the `location /ingest { return 404;
 }` block that must be added once nginx exists, since the shared-secret header
