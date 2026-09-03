@@ -6,6 +6,7 @@ import formbody from "@fastify/formbody";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "./env";
 import { ingestRoutes } from "./routes/ingest";
+import { publicIngestRoutes } from "./routes/public-e";
 import { loginRoutes } from "./routes/login";
 import { homeRoutes } from "./routes/home";
 import { visitDetailRoutes } from "./routes/visit-detail";
@@ -60,6 +61,7 @@ async function main(): Promise<void> {
   await fastify.register(homeRoutes);
   await fastify.register(visitDetailRoutes);
   await fastify.register(ingestRoutes);
+  await fastify.register(publicIngestRoutes);
 
   await fastify.listen({ port: env.port, host: "0.0.0.0" });
 }
