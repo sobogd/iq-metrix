@@ -5,11 +5,17 @@ import { prisma } from "../db";
 import { type RawFacts, clientNetwork, hashEntropy, visitSeed } from "../lib/request-facts";
 import { sessionHash } from "../lib/session-hash";
 import { getSalt } from "../lib/salt";
-import { applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
+import { applyAttribution, applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
 import { signVisitToken, verifyVisitToken } from "../lib/visit-token";
 import { isBotUa } from "../lib/bot-filter";
 import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX } from "../lib/labels";
-import { allowedMetaKeys, mergeVisitMeta, sanitizeMeta } from "../lib/meta-sanitizer";
+import {
+  type Attribution,
+  allowedMetaKeys,
+  extractAttribution,
+  mergeVisitMeta,
+  sanitizeMeta,
+} from "../lib/meta-sanitizer";
 
 // The one write path for analytics data. Auth is a shared-secret header, not
 // a session — this is a service-to-service call from a relay living inside
@@ -54,6 +60,10 @@ interface ParsedEvent {
   name: string;
   locale: string | null;
   meta: Record<string, string>;
+  /** from/ref/theme pulled out of this event's raw `meta` — see
+   *  extractAttribution. Not part of `meta` above (that's already been
+   *  stripped of these reserved keys by sanitizeMeta). */
+  attribution: Attribution;
   at: Date | null;
 }
 
@@ -75,6 +85,15 @@ function clampToVisit(at: Date | null, firstAt: Date, now: Date, index: number):
   return at < firstAt ? firstAt : at;
 }
 
+/** First non-null candidate, in order. Used to pick one from/ref/theme value
+ *  out of everything this batch offered (visit-level meta, then each
+ *  event's, in array order) before handing it to applyAttribution — whose
+ *  own DB-level null guard is what actually decides whether it sticks. */
+function firstNonNull(values: ReadonlyArray<string | null>): string | null {
+  for (const v of values) if (v !== null) return v;
+  return null;
+}
+
 function parseEvent(raw: unknown, allowed: ReadonlySet<string>, now: Date): ParsedEvent | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as RawEventBody;
@@ -83,7 +102,15 @@ function parseEvent(raw: unknown, allowed: ReadonlySet<string>, now: Date): Pars
   const name = typeof r.name === "string" && NAME_REGEX.test(r.name) ? r.name : null;
   if (!page || !action || !name) return null;
   const locale = typeof r.locale === "string" && LOCALE_REGEX.test(r.locale) ? r.locale.toLowerCase() : null;
-  return { page, action, name, locale, meta: sanitizeMeta(r.meta, allowed), at: parseTs(r.at, now) };
+  return {
+    page,
+    action,
+    name,
+    locale,
+    meta: sanitizeMeta(r.meta, allowed),
+    attribution: extractAttribution(r.meta),
+    at: parseTs(r.at, now),
+  };
 }
 
 function parseHeaders(raw: unknown): Record<string, string> {
@@ -136,6 +163,11 @@ export async function ingestRoutes(fastify: FastifyInstance): Promise<void> {
     const app = typeof body.app === "string" && APP_REGEX.test(body.app) ? body.app : null;
     const email = typeof body.email === "string" && body.email ? body.email : null;
     const bodyMeta = sanitizeMeta(body.meta, allowed);
+    // `from`/`ref`/`theme` inside `meta` (visit-level here; per-event inside
+    // parseEvent above) — reserved keys that bypass the site's metaKeys
+    // allowlist entirely and never land in the stored meta blob. See
+    // meta-sanitizer.ts's extractAttribution / RESERVED_META_KEYS.
+    const bodyAttribution = extractAttribution(body.meta);
 
     // A batch carrying a valid continuation token lands on its own visit row
     // directly — immune to the hash flapping mid-visit (mobile network
@@ -159,9 +191,22 @@ export async function ingestRoutes(fastify: FastifyInstance): Promise<void> {
 
     // This call's contributed meta (visit-level + every event's, in order —
     // see mergeVisitMeta's precedence doc) applied onto the visit's existing
-    // snapshot.
+    // snapshot. Reserved from/ref/theme keys are already stripped out of
+    // both bodyMeta and each event's meta by this point.
     const contributedMeta = mergeVisitMeta({}, bodyMeta, events.map((e) => e.meta));
     await applyIngestSnapshot(visit, { app, meta: contributedMeta }, now);
+
+    // First-write-wins from/ref/theme, independent of the latest-wins meta
+    // snapshot above. Candidates are visit-level meta first, then each
+    // event's, in order; applyAttribution's own null-guarded update is what
+    // actually enforces "only if not already set" (a race-safe DB check, not
+    // just this in-memory pick).
+    const attributionCandidates: Attribution[] = [bodyAttribution, ...events.map((e) => e.attribution)];
+    await applyAttribution(visit.id, {
+      from: firstNonNull(attributionCandidates.map((a) => a.from)),
+      ref: firstNonNull(attributionCandidates.map((a) => a.ref)),
+      theme: firstNonNull(attributionCandidates.map((a) => a.theme)),
+    });
 
     await prisma.event.createMany({
       data: events.map((e, i) => ({

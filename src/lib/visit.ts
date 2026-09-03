@@ -2,6 +2,7 @@ import { Prisma, type Visit } from "@prisma/client";
 import { prisma } from "../db";
 import { visitKey } from "./session-hash";
 import type { VisitSeed } from "./request-facts";
+import type { Attribution } from "./meta-sanitizer";
 
 // One visit = one row. A visit starts anonymous (keyed by the day-scoped
 // device hash) and is promoted in place the moment an email resolves, so the
@@ -15,8 +16,13 @@ import type { VisitSeed } from "./request-facts";
 // Ported from iq-rest (apps/dashboard-api/src/analytics-v2/visit.service.ts)
 // and translator (lib/analytics/visit.ts), made multi-tenant (every lookup is
 // scoped by siteId — two different sites must never resolve, fold or
-// continue each other's rows) and adapted to a generic `meta` Json bag
-// instead of hardcoded attribution/click-id columns.
+// continue each other's rows) and adapted to a generic `meta` Json bag for
+// custom per-site fields. `from`/`ref`/`theme` keep the reference
+// implementations' own dedicated columns and first-write-wins semantics
+// (applyAttribution below) — only the transport changed: they arrive as
+// three reserved keys inside `meta` instead of a separate `ctx` object, see
+// meta-sanitizer.ts's extractAttribution. Ad/click-id columns are dropped
+// entirely (out of scope — being removed from both source products).
 
 /** A visit ends after this much silence. Without it a "visit" is the whole
  *  salt-day: a morning arrival and an unrelated evening sign-in from the
@@ -48,10 +54,15 @@ async function fold(anon: Visit, target: Visit, now: Date): Promise<Visit> {
         lastAt: now,
         mergeCount: { increment: 1 },
         firstAt: anon.firstAt < target.firstAt ? anon.firstAt : target.firstAt,
-        // Meta the anonymous half carried that the signed-in row lacks —
-        // target's own values always win.
+        // Meta/attribution the anonymous half carried that the signed-in row
+        // lacks — target's own values always win. Same "never overwrite a
+        // set value" rule as applyAttribution's null guard below, just
+        // expressed in-transaction here since both rows are already in hand.
         meta: { ...anonMeta, ...targetMeta },
         ...(target.app === null && anon.app !== null ? { app: anon.app } : {}),
+        ...(target.from === null && anon.from !== null ? { from: anon.from } : {}),
+        ...(target.ref === null && anon.ref !== null ? { ref: anon.ref } : {}),
+        ...(target.theme === null && anon.theme !== null ? { theme: anon.theme } : {}),
       },
     }),
     // deleteMany, not delete: two concurrent batches can both decide to fold,
@@ -165,12 +176,11 @@ export async function continueVisit(
 
 /** Latest-wins patch applied on every ingest call: `app` (if the caller sent
  *  one) and the merged `meta` snapshot (see meta-sanitizer.ts). Unlike
- *  enrich() in the reference implementations (first-write-wins attribution),
- *  this is deliberately latest-wins — Visit.meta is documented as "the
- *  denormalized latest values", and a visit can legitimately move between
- *  sub-apps or contexts (e.g. an owner switching restaurants). Skipped
- *  entirely when there is nothing new to write, so a plain pageview batch
- *  costs no extra query. */
+ *  applyAttribution below (first-write-wins), this is deliberately
+ *  latest-wins — Visit.meta is documented as "the denormalized latest
+ *  values", and a visit can legitimately move between sub-apps or contexts
+ *  (e.g. an owner switching restaurants). Skipped entirely when there is
+ *  nothing new to write, so a plain pageview batch costs no extra query. */
 export async function applyIngestSnapshot(
   visit: Visit,
   patch: { app: string | null; meta: Record<string, string> },
@@ -189,4 +199,31 @@ export async function applyIngestSnapshot(
       ...(metaChanged ? { meta: { ...existingMeta, ...patch.meta } } : {}),
     },
   });
+}
+
+/**
+ * First-write-wins enrichment for from/ref/theme, ported from the reference
+ * implementations' enrich() (iq-rest's visit.service.ts / translator's
+ * visit.ts) — same semantics, adapted to this service's dedicated
+ * applyAttribution call site (routes/ingest.ts extracts the values out of
+ * `meta` first; see meta-sanitizer.ts's extractAttribution).
+ *
+ * Each field's update is guarded by `<field>: null` in the WHERE clause, not
+ * just an in-memory null check on an already-read Visit object — that is
+ * what makes this race-safe. Two concurrent batches racing to be first with
+ * a value both pass the in-memory check, but only one write can match `id`
+ * AND `<field>: null` at the DB — the loser's updateMany matches zero rows
+ * and silently no-ops instead of clobbering the winner. Getting this wrong
+ * (unconditional overwrite) would corrupt first-touch attribution.
+ */
+export async function applyAttribution(visitId: string, attr: Attribution): Promise<void> {
+  if (attr.from) {
+    await prisma.visit.updateMany({ where: { id: visitId, from: null }, data: { from: attr.from } });
+  }
+  if (attr.ref) {
+    await prisma.visit.updateMany({ where: { id: visitId, ref: null }, data: { ref: attr.ref } });
+  }
+  if (attr.theme) {
+    await prisma.visit.updateMany({ where: { id: visitId, theme: null }, data: { theme: attr.theme } });
+  }
 }

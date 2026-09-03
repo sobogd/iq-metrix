@@ -88,9 +88,21 @@ Key differences from both references (see file-level comments in
 `src/lib/**` for the reasoning): multi-tenant (`siteId` on every query, not
 a single global salt/visit space), one `email` identity field instead of a
 hardcoded `userId`/`restaurantId` split or `email`+`topicId`, a generic
-`meta` Json bag instead of hardcoded attribution columns, and no ad/click-id
-handling at all (that feature is being removed from both source products
-separately).
+`meta` Json bag for custom per-site fields, and no ad/click-id handling at
+all (that feature is being removed from both source products separately).
+
+`from` / `ref` / `theme` keep their own dedicated `Visit` columns and
+first-write-wins semantics exactly like both references — only the
+transport changed. The `/ingest` contract has no separate `ctx` object, so
+these three are reserved keys inside the existing `meta` object instead
+(visit-level and/or per-event): every site accepts them regardless of its
+own `metaKeys` registry, they don't count against the per-call 8-key cap,
+and they never end up stored in the `meta` Json blob — `routes/ingest.ts`
+pulls them out (`meta-sanitizer.ts`'s `extractAttribution`, validated with
+`FROM_REGEX`/`HOST_REGEX`/`THEME_REGEX` ported verbatim from iq-rest's
+`track-v2.controller.ts`) and writes them into `Visit.from`/`ref`/`theme` via
+`visit.ts`'s `applyAttribution`, guarded by an `is null` check in the update
+itself so a value already set is never clobbered by a later event.
 
 ### Migration
 
