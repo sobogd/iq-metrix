@@ -21,26 +21,27 @@ export interface VisitListPageData {
   hasNext: boolean;
 }
 
-function topbar(): string {
+function topbar(sites: Site[], currentSiteId?: string): string {
+  const siteLinks = sites
+    .map((s) => `<a href="/?site=${escapeHtml(s.id)}" class="site-link${s.id === currentSiteId ? " active" : ""}">${escapeHtml(s.id)}</a>`)
+    .join("");
   return `
 <header class="topbar">
   <h1>📊 iq-metrix</h1>
+  ${siteLinks ? `<nav class="site-nav">${siteLinks}</nav>` : ""}
   <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
 </header>`;
 }
 
 export function renderNoSitesPage(): string {
-  const body = `${topbar()}<main class="placeholder">
+  const body = `${topbar([])}<main class="placeholder">
     <p>⚠️ No sites configured yet.</p>
     <p class="muted">Run <code>npx prisma db seed</code> against this service's database, then reload.</p>
   </main>`;
   return renderLayout("No sites", body);
 }
 
-function renderFilterForm(sites: Site[], f: QueryFilters, registry: MetaKeysRegistry): string {
-  const siteOptions = sites
-    .map((s) => `<option value="${escapeHtml(s.id)}"${s.id === f.site ? " selected" : ""}>${escapeHtml(s.id)}</option>`)
-    .join("");
+function renderFilterForm(f: QueryFilters, registry: MetaKeysRegistry): string {
   const metaKeyOptions = [
     `<option value="">— any —</option>`,
     ...Object.entries(registry).map(([key, cfg]) => {
@@ -51,9 +52,7 @@ function renderFilterForm(sites: Site[], f: QueryFilters, registry: MetaKeysRegi
 
   return `
   <form class="filters" method="get" action="/">
-    <label>Site
-      <select name="site">${siteOptions}</select>
-    </label>
+    <input type="hidden" name="site" value="${escapeHtml(f.site)}" />
     <label>App
       <input type="text" name="app" value="${escapeHtml(f.app)}" placeholder="dashboard" />
     </label>
@@ -127,9 +126,9 @@ function renderPagination(f: QueryFilters, page: number, hasNext: boolean): stri
 
 export function renderVisitListPage(data: VisitListPageData): string {
   const registry = asMetaKeysRegistry(data.currentSite.metaKeys);
-  const body = `${topbar()}
+  const body = `${topbar(data.sites, data.currentSite.id)}
 <main class="dashboard">
-  ${renderFilterForm(data.sites, data.raw, registry)}
+  ${renderFilterForm(data.raw, registry)}
   ${renderTable(data.items)}
   ${renderPagination(data.raw, data.page, data.hasNext)}
 </main>`;
