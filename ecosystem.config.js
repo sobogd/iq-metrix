@@ -19,6 +19,7 @@ module.exports = {
       name: "iq-metrix",
       cwd: __dirname,
       script: "dist/server.js",
+      node_args: ["--env-file=.env"],
       exec_mode: "fork",
       instances: 1,
       autorestart: true,
