@@ -1,15 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
-import {
-  deviceBreakdown,
-  listSites,
-  listVisits,
-  toVisitFilters,
-  topCountries,
-  topPages,
-  visitsPerDay,
-  type QueryFilters,
-} from "../lib/visit-queries";
+import { listSites, listVisits, toVisitFilters, type QueryFilters } from "../lib/visit-queries";
 import { renderNoSitesPage, renderVisitListPage } from "../views/visit-list-page";
 
 function str(v: unknown): string {
@@ -61,24 +52,8 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
     };
     const filters = toVisitFilters(raw);
 
-    const [{ items, hasNext }, vpd, countries, devices, pages] = await Promise.all([
-      listVisits(filters, page),
-      visitsPerDay(filters),
-      topCountries(filters),
-      deviceBreakdown(filters),
-      topPages(filters),
-    ]);
+    const { items, hasNext } = await listVisits(filters, page);
 
-    return reply.send(
-      renderVisitListPage({
-        sites,
-        currentSite,
-        raw,
-        items,
-        page,
-        hasNext,
-        charts: { visitsPerDay: vpd, topCountries: countries, deviceBreakdown: devices, topPages: pages },
-      }),
-    );
+    return reply.send(renderVisitListPage({ sites, currentSite, raw, items, page, hasNext }));
   });
 }

@@ -1,15 +1,16 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout } from "./layout";
-import { asMetaKeysRegistry, countryEmoji, deviceEmoji, fmtDateTime, renderMetaChips, type MetaKeysRegistry } from "./format";
-import { renderRankedBars, renderTimeSeriesBars, type ChartPoint } from "../lib/svg-chart";
+import {
+  asMetaKeysRegistry,
+  countryEmoji,
+  countryName,
+  deviceTypeEmoji,
+  fmtShortDateTime,
+  osEmoji,
+  themeEmoji,
+  type MetaKeysRegistry,
+} from "./format";
 import type { QueryFilters, VisitListItem } from "../lib/visit-queries";
-
-export interface VisitListCharts {
-  visitsPerDay: ChartPoint[];
-  topCountries: ChartPoint[];
-  deviceBreakdown: ChartPoint[];
-  topPages: ChartPoint[];
-}
 
 export interface VisitListPageData {
   sites: Site[];
@@ -18,7 +19,6 @@ export interface VisitListPageData {
   items: VisitListItem[];
   page: number;
   hasNext: boolean;
-  charts: VisitListCharts;
 }
 
 function topbar(): string {
@@ -77,56 +77,27 @@ function renderFilterForm(sites: Site[], f: QueryFilters, registry: MetaKeysRegi
   </form>`;
 }
 
-function renderCharts(charts: VisitListCharts): string {
+function renderRow(item: VisitListItem): string {
+  const flag = countryEmoji(item.country);
+  const refSource = item.from || item.ref;
+  const ref = refSource
+    ? `<span class="visit-ref" title="${escapeHtml(refSource)}">${escapeHtml(refSource)}</span>`
+    : "";
   return `
-  <div class="charts">
-    <div class="chart-card chart-wide">
-      <h3>📈 Visits per day <span class="muted">(30d)</span></h3>
-      ${renderTimeSeriesBars(charts.visitsPerDay, { width: 640, height: 120 })}
-    </div>
-    <div class="chart-card">
-      <h3>🌍 Top countries</h3>
-      ${renderRankedBars(charts.topCountries)}
-    </div>
-    <div class="chart-card">
-      <h3>📱 Device breakdown</h3>
-      ${renderRankedBars(charts.deviceBreakdown)}
-    </div>
-    <div class="chart-card">
-      <h3>📄 Top pages</h3>
-      ${renderRankedBars(charts.topPages)}
-    </div>
-  </div>`;
+  <a class="visit-row" href="/visits/${escapeHtml(item.id)}">
+    <span class="flag-wrap">${flag}<span class="flag-tooltip">${escapeHtml(countryName(item.country))}</span></span>
+    <span class="visit-time">${fmtShortDateTime(item.lastAt)}</span>
+    <span class="visit-icon">${deviceTypeEmoji(item.device)}</span>
+    <span class="visit-icon">${osEmoji(item.os)}</span>
+    <span class="visit-icon">${themeEmoji(item.theme)}</span>
+    <span class="visit-icon">${item.email ? "👤" : "👻"}</span>
+    ${ref}
+  </a>`;
 }
 
-const HEAD_CELLS = ["🕐 When", "📱 Device", "🌍 Location", "👤 Identity", "🧩 App", "🔢 Events", "📄 First page", "🏷️ Meta", ""];
-
-function renderHead(): string {
-  return `<div class="viz-row viz-head">${HEAD_CELLS.map((h) => `<span class="viz-cell">${h}</span>`).join("")}</div>`;
-}
-
-function renderRow(item: VisitListItem, registry: MetaKeysRegistry): string {
-  const identity = item.email ? `✉️ ${escapeHtml(item.email)}` : `👻 anon`;
-  const device = `${deviceEmoji(item.device)} ${escapeHtml(item.os ?? "—")}`;
-  const location = `${countryEmoji(item.country)} ${escapeHtml(item.country)}${item.city ? ` · ${escapeHtml(item.city)}` : ""}`;
-  const when = `${fmtDateTime(item.firstAt)} <span class="muted">→</span> ${fmtDateTime(item.lastAt)}`;
-  return `
-  <div class="viz-row">
-    <span class="viz-cell" data-label="When">${when}</span>
-    <span class="viz-cell" data-label="Device">${device}</span>
-    <span class="viz-cell" data-label="Location">${location}</span>
-    <span class="viz-cell" data-label="Identity">${identity}</span>
-    <span class="viz-cell" data-label="App">${item.app ? escapeHtml(item.app) : `<span class="muted">—</span>`}</span>
-    <span class="viz-cell" data-label="Events">${item.eventCount}</span>
-    <span class="viz-cell" data-label="First page">${item.firstPage ? escapeHtml(item.firstPage) : `<span class="muted">—</span>`}</span>
-    <span class="viz-cell" data-label="Meta">${renderMetaChips(item.meta, registry)}</span>
-    <span class="viz-cell" data-label="">🔎 <a href="/visits/${escapeHtml(item.id)}">View</a></span>
-  </div>`;
-}
-
-function renderTable(items: VisitListItem[], registry: MetaKeysRegistry): string {
+function renderTable(items: VisitListItem[]): string {
   if (items.length === 0) return `<p class="muted">No visits match these filters.</p>`;
-  return `<div class="viz">${renderHead()}${items.map((i) => renderRow(i, registry)).join("")}</div>`;
+  return `<div class="visits">${items.map((i) => renderRow(i)).join("")}</div>`;
 }
 
 /** Pagination/reset links use the canonical `meta.<key>=<value>` querystring
@@ -159,8 +130,7 @@ export function renderVisitListPage(data: VisitListPageData): string {
   const body = `${topbar()}
 <main class="dashboard">
   ${renderFilterForm(data.sites, data.raw, registry)}
-  ${renderCharts(data.charts)}
-  ${renderTable(data.items, registry)}
+  ${renderTable(data.items)}
   ${renderPagination(data.raw, data.page, data.hasNext)}
 </main>`;
   return renderLayout("Visits", body);

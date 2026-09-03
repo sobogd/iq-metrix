@@ -13,6 +13,15 @@ export function fmtDateTime(d: Date): string {
   }).format(d);
 }
 
+/** dd.mm hh:mm — compact form for the visit list row. */
+export function fmtShortDateTime(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}.${mm} ${hh}:${mi}`;
+}
+
 /** Flag emoji from a 2-letter ISO country code via the Unicode regional
  *  indicator trick. "XX" (this service's own default for "unknown") and
  *  anything else non-ISO-shaped falls back to a globe. */
@@ -21,11 +30,39 @@ export function countryEmoji(code: string): string {
   return [...code.toUpperCase()].map((c) => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
 }
 
+const countryDisplayNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+/** Full country name for the flag's hover tooltip. */
+export function countryName(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code) || code.toUpperCase() === "XX") return "Unknown";
+  return countryDisplayNames.of(code.toUpperCase()) ?? code.toUpperCase();
+}
+
 export function deviceEmoji(device: string | null): string {
   if (device === "mobile") return "📱";
   if (device === "tablet") return "📟";
   if (device === "desktop") return "🖥️";
   return "❓";
+}
+
+/** Device TYPE icon for the visit list row — only 3 states, per spec. */
+export function deviceTypeEmoji(device: string | null): string {
+  if (device === "desktop") return "💻";
+  if (device === "mobile") return "📱";
+  return "🔌";
+}
+
+/** OS icon for the visit list row — only 4 states, per spec (windows/macos
+ *  fold into "unknown" alongside null/other). */
+export function osEmoji(os: string | null): string {
+  if (os === "android") return "🤖";
+  if (os === "ios") return "🍎";
+  if (os === "linux") return "🐧";
+  return "🎛️";
+}
+
+export function themeEmoji(theme: string | null): string {
+  return theme === "dark" ? "🌙" : "☀️";
 }
 
 /** A site's metaKeys registry, loosely typed — it's a Prisma Json column, so

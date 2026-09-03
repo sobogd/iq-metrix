@@ -315,35 +315,84 @@ code {
   border-color: var(--accent);
 }
 
-/* ---------- Charts ---------- */
+/* ---------- Visit list rows ---------- *
+ *
+ * One compact div-based row per visit (not a table): flag, last-visit time,
+ * device/os/theme/identity icons, then the referrer pinned to the right
+ * edge. Flex + wrap instead of the .viz table/card system — the row must
+ * stay one line on desktop and at most two on mobile, never stretch to
+ * fill stacked label/value pairs.
+ */
 
-.charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
+.visits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.chart-card {
+.visit-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  overflow-x: auto;
+  padding: 10px 14px;
+  color: var(--text);
+  text-decoration: none;
 }
 
-.chart-card h3 {
-  margin: 0 0 10px;
+.visit-row:hover {
+  border-color: var(--accent);
+}
+
+.visit-time {
+  color: var(--muted);
   font-size: 13px;
-  font-weight: 600;
+  white-space: nowrap;
 }
 
-.chart-wide {
-  grid-column: 1 / -1;
+.visit-icon {
+  font-size: 15px;
+  line-height: 1;
 }
 
-.chart-card svg {
-  max-width: 100%;
-  height: auto;
+.flag-wrap {
+  position: relative;
+  display: inline-flex;
+  font-size: 16px;
+}
+
+.flag-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--text);
+  z-index: 10;
+}
+
+.flag-wrap:hover .flag-tooltip {
+  display: block;
+}
+
+.visit-ref {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- Meta chips ---------- */

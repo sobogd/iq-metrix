@@ -1,6 +1,5 @@
 import { Prisma, type Event, type Site, type Visit } from "@prisma/client";
 import { prisma } from "../db";
-import { coerceMeta } from "../views/format";
 
 // Read-only query layer for the admin visit list / detail pages
 // (routes/home.ts, routes/visit-detail.ts). Raw SQL, not the Prisma model
@@ -12,8 +11,6 @@ import { coerceMeta } from "../views/format";
 // expression the index was built for.
 
 const PAGE_SIZE = 30;
-const CHART_LIMIT = 8;
-const CHART_DAYS = 30;
 
 /** Filter state as read off the querystring — everything a string (or
  *  empty string for "unset"), because that's what an HTML form/query param
@@ -106,27 +103,9 @@ export interface VisitListItem {
   region: string;
   city: string;
   email: string | null;
-  app: string | null;
-  meta: Record<string, string>;
-  eventCount: number;
-  firstPage: string | null;
-}
-
-interface RawVisitListRow {
-  id: string;
-  siteId: string;
-  firstAt: Date;
-  lastAt: Date;
-  device: string | null;
-  os: string | null;
-  country: string;
-  region: string;
-  city: string;
-  email: string | null;
-  app: string | null;
-  meta: unknown;
-  eventCount: number;
-  firstPage: string | null;
+  theme: string | null;
+  from: string | null;
+  ref: string | null;
 }
 
 /** Page of visits for the given filters, newest-active-first. Offset
@@ -141,19 +120,17 @@ export async function listVisits(
 ): Promise<{ items: VisitListItem[]; hasNext: boolean }> {
   const where = whereSql(visitConditions(filters, "v"));
   const offset = Math.max(0, page - 1) * PAGE_SIZE;
-  const rows = await prisma.$queryRaw<RawVisitListRow[]>`
+  const rows = await prisma.$queryRaw<VisitListItem[]>`
     SELECT
       v.id, v."siteId", v."firstAt", v."lastAt", v.device, v.os,
-      v.country, v.region, v.city, v.email, v.app, v.meta,
-      (SELECT COUNT(*)::int FROM "Event" e WHERE e."visitId" = v.id) AS "eventCount",
-      (SELECT e2.page FROM "Event" e2 WHERE e2."visitId" = v.id ORDER BY e2.at ASC LIMIT 1) AS "firstPage"
+      v.country, v.region, v.city, v.email, v.theme, v.from, v.ref
     FROM "Visit" v
     WHERE ${where}
     ORDER BY v."lastAt" DESC
     LIMIT ${PAGE_SIZE + 1} OFFSET ${offset}
   `;
   const hasNext = rows.length > PAGE_SIZE;
-  const items: VisitListItem[] = rows.slice(0, PAGE_SIZE).map((r) => ({ ...r, meta: coerceMeta(r.meta) }));
+  const items = rows.slice(0, PAGE_SIZE);
   return { items, hasNext };
 }
 
@@ -164,70 +141,3 @@ export async function getVisitDetail(id: string): Promise<{ visit: Visit; events
   return { visit, events };
 }
 
-export interface ChartPoint {
-  label: string;
-  value: number;
-}
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function shortDay(d: Date): string {
-  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(d);
-}
-
-/** Fixed rolling 30-day window, per the task spec — deliberately NOT the
- *  from/to date-range filter (that would make "last 30 days" a lie the
- *  moment someone picks a different range). Still respects site/app/email/
- *  meta, same as the other charts. */
-export async function visitsPerDay(filters: VisitFilters): Promise<ChartPoint[]> {
-  const since = new Date(Date.now() - CHART_DAYS * 86_400_000);
-  const conditions = visitConditions(filters, "v");
-  conditions.push(Prisma.sql`v."firstAt" >= ${since}`);
-  const rows = await prisma.$queryRaw<{ day: Date; n: number }[]>`
-    SELECT date_trunc('day', v."firstAt") AS day, COUNT(*)::int AS n
-    FROM "Visit" v
-    WHERE ${whereSql(conditions)}
-    GROUP BY 1
-    ORDER BY 1
-  `;
-  const byDay = new Map(rows.map((r) => [isoDay(r.day), r.n]));
-  const points: ChartPoint[] = [];
-  for (let i = CHART_DAYS - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86_400_000);
-    points.push({ label: shortDay(d), value: byDay.get(isoDay(d)) ?? 0 });
-  }
-  return points;
-}
-
-export async function topCountries(filters: VisitFilters): Promise<ChartPoint[]> {
-  const rows = await prisma.$queryRaw<{ country: string; n: number }[]>`
-    SELECT v.country, COUNT(*)::int AS n
-    FROM "Visit" v
-    WHERE ${whereSql(visitConditions(filters, "v"))}
-    GROUP BY 1 ORDER BY n DESC LIMIT ${CHART_LIMIT}
-  `;
-  return rows.map((r) => ({ label: r.country, value: r.n }));
-}
-
-export async function deviceBreakdown(filters: VisitFilters): Promise<ChartPoint[]> {
-  const rows = await prisma.$queryRaw<{ device: string; n: number }[]>`
-    SELECT COALESCE(v.device, 'unknown') AS device, COUNT(*)::int AS n
-    FROM "Visit" v
-    WHERE ${whereSql(visitConditions(filters, "v"))}
-    GROUP BY 1 ORDER BY n DESC
-  `;
-  return rows.map((r) => ({ label: r.device, value: r.n }));
-}
-
-export async function topPages(filters: VisitFilters): Promise<ChartPoint[]> {
-  const rows = await prisma.$queryRaw<{ page: string; n: number }[]>`
-    SELECT e.page, COUNT(*)::int AS n
-    FROM "Event" e
-    JOIN "Visit" v ON v.id = e."visitId"
-    WHERE ${whereSql(visitConditions(filters, "v"))}
-    GROUP BY e.page ORDER BY n DESC LIMIT ${CHART_LIMIT}
-  `;
-  return rows.map((r) => ({ label: r.page, value: r.n }));
-}
