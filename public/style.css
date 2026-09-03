@@ -49,22 +49,35 @@ a {
 /* ---------- Top bar (signed-in pages) ---------- */
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
   max-width: var(--max-width);
   margin: 0 auto;
 }
 
 .site-nav {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
   margin-right: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.site-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .site-link {
@@ -74,6 +87,7 @@ a {
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .site-link:hover {
@@ -346,11 +360,10 @@ code {
 
 /* ---------- Visit list rows ---------- *
  *
- * One compact div-based row per visit (not a table): flag, last-visit time,
- * device/os/theme/identity icons, then the referrer pinned to the right
- * edge. Flex + wrap instead of the .viz table/card system — the row must
- * stay one line on desktop and at most two on mobile, never stretch to
- * fill stacked label/value pairs.
+ * One compact two-line row per visit: flag on the left, identity + app on
+ * the primary line, device/os/theme icons + event count + duration + last
+ * page on the secondary line, timestamp on the right. Works as a single
+ * full-width list item on phone — no table/card switch needed.
  */
 
 .visits {
@@ -362,35 +375,88 @@ code {
 .visit-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 14px;
+  padding: 12px 14px;
   color: var(--text);
   text-decoration: none;
+  min-height: 58px;
 }
 
 .visit-row:hover {
   border-color: var(--accent);
 }
 
+.visit-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.visit-id-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.visit-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 58vw;
+}
+
+.app-badge {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--accent-2);
+  background: rgba(126, 224, 195, 0.12);
+  border: 1px solid rgba(126, 224, 195, 0.35);
+  border-radius: 6px;
+  padding: 3px 7px;
+}
+
+.visit-sub-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.visit-icons {
+  flex: 0 0 auto;
+}
+
+.visit-stats {
+  overflow-wrap: anywhere;
+}
+
 .visit-time {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  padding-top: 2px;
   color: var(--muted);
   font-size: 13px;
   white-space: nowrap;
 }
 
-.visit-icon {
-  font-size: 15px;
-  line-height: 1;
-}
-
 .flag-wrap {
   position: relative;
   display: inline-flex;
-  font-size: 16px;
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .flag-tooltip {
@@ -412,16 +478,6 @@ code {
 
 .flag-wrap:hover .flag-tooltip {
   display: block;
-}
-
-.visit-ref {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 13px;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* ---------- Meta chips ---------- */
@@ -505,4 +561,177 @@ a.chip:hover {
 .meta-block .k {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* ---------- Summary strip (numeric cards, no charts) ---------- */
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 720px) {
+  .summary {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.stat {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stat-live .stat-value {
+  color: var(--accent-2);
+}
+
+/* ---------- Breakdown lists (ranked, no charts) ---------- */
+
+.breakdowns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .breakdowns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.breakdown {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rank-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.rank-row:last-child {
+  border-bottom: none;
+}
+
+.rank-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Date presets ---------- */
+
+.presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.preset {
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.preset:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.preset.active {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+/* ---------- Mobile touch targets ---------- */
+
+@media (max-width: 720px) {
+  .preset,
+  .site-link,
+  .link-btn {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .filters button {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .dashboard {
+    padding: 16px;
+    gap: 16px;
+  }
+}
+
+/* ---------- Client classification badges ---------- */
+
+.client-badge {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 6px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.client-search {
+  color: #f6c85f;
+  border-color: rgba(246, 200, 95, 0.4);
+  background: rgba(246, 200, 95, 0.1);
+}
+
+.client-ai {
+  color: #b78cff;
+  border-color: rgba(183, 140, 255, 0.4);
+  background: rgba(183, 140, 255, 0.1);
+}
+
+.client-bot {
+  color: var(--muted);
+  background: var(--panel-2);
 }

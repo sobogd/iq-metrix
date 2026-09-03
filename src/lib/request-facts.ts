@@ -1,4 +1,5 @@
 import { UAParser } from "ua-parser-js";
+import { classifyClient, type VisitClient } from "./client-kind";
 
 // Everything we derive from the raw request facts the relay forwards.
 //
@@ -139,6 +140,8 @@ export interface VisitSeed {
   region: string;
   city: string;
   lang: string | null;
+  /** UA classification (never the raw UA) — see client-kind.ts. */
+  client: VisitClient;
 }
 
 /**
@@ -157,6 +160,7 @@ export function visitSeed(facts: RawFacts): VisitSeed {
     region: decodeHeader(facts, "cf-region"),
     city: decodeHeader(facts, "cf-ipcity"),
     lang: acceptLanguage(facts),
+    client: classifyClient(facts.ua),
   };
 }
 

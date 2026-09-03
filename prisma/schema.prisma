@@ -72,6 +72,10 @@ model Visit {
   // Free-form sub-app label within the site, e.g. "landing" | "dashboard" |
   // "web" — which part of the product the visit happened in.
   app   String?
+  // Classification of the visit's user-agent, set at ingest: 'human' |
+  // 'search' | 'ai' | 'bot'. Null for legacy rows (imported history predates
+  // this column). The raw UA is never stored — see src/lib/client-kind.ts.
+  client String?
   // Denormalized latest values of custom per-site fields (restaurantId,
   // topicId, plan, ...), updated on every ingest call from the latest
   // event(s) so the visit list can filter/show it without joining events.

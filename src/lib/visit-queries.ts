@@ -20,6 +20,8 @@ const PAGE_SIZE = 30;
 export interface QueryFilters {
   site: string;
   app: string;
+  /** 'human' (default) | 'search' | 'ai' | 'bot' | 'all'. */
+  client: string;
   from: string; // yyyy-mm-dd
   to: string; // yyyy-mm-dd
   email: string;
@@ -30,6 +32,7 @@ export interface QueryFilters {
 export interface VisitFilters {
   siteId: string;
   app: string | null;
+  client: string;
   from: Date | null;
   to: Date | null;
   email: string | null;
@@ -55,6 +58,7 @@ export function toVisitFilters(q: QueryFilters): VisitFilters {
   return {
     siteId: q.site,
     app: q.app || null,
+    client: q.client || "human",
     from: parseDay(q.from),
     to: parseDayEnd(q.to),
     email: q.email || null,
@@ -63,13 +67,24 @@ export function toVisitFilters(q: QueryFilters): VisitFilters {
   };
 }
 
-/** WHERE conditions shared by the visit list and every chart aggregate.
- *  `alias` is a fixed identifier this module controls (never user input),
- *  injected via Prisma.raw — the only thing that makes that safe. */
+/** SQL predicate for the client-classification filter. `alias` is a fixed
+ *  identifier this module controls (never user input). 'human' also admits
+ *  NULL (legacy/imported rows predate the column); 'all' matches everything. */
+function clientPredicate(alias: string, client: string): Prisma.Sql {
+  const a = Prisma.raw(alias);
+  if (client === "human") return Prisma.sql`(${a}."client" IS NULL OR ${a}."client" = 'human')`;
+  if (client === "search" || client === "ai" || client === "bot") return Prisma.sql`${a}."client" = ${client}`;
+  return Prisma.sql`TRUE`;
+}
+
+/** WHERE conditions shared by the visit list and its aggregates. `alias` is
+ *  a fixed identifier this module controls (never user input), injected via
+ *  Prisma.raw — the only thing that makes that safe. */
 function visitConditions(f: VisitFilters, alias: string): Prisma.Sql[] {
   const a = Prisma.raw(alias);
   const cond: Prisma.Sql[] = [Prisma.sql`${a}."siteId" = ${f.siteId}`];
   if (f.app) cond.push(Prisma.sql`${a}."app" = ${f.app}`);
+  cond.push(clientPredicate(alias, f.client));
   if (f.from) cond.push(Prisma.sql`${a}."firstAt" >= ${f.from}`);
   if (f.to) cond.push(Prisma.sql`${a}."firstAt" <= ${f.to}`);
   if (f.email) cond.push(Prisma.sql`${a}."email" ILIKE ${`%${f.email}%`}`);
@@ -102,18 +117,35 @@ export interface VisitListItem {
   country: string;
   region: string;
   city: string;
+  lang: string | null;
   email: string | null;
   theme: string | null;
   from: string | null;
   ref: string | null;
+  app: string | null;
+  client: string | null;
+  /** Denormalized latest meta snapshot (Visit.meta, jsonb). Coerced in the view. */
+  meta: unknown;
+  /** How many anonymous rows were folded into this one. */
+  mergeCount: number;
+  /** Event count for this visit (lateral aggregate below). */
+  eventCount: number;
+  /** Distinct pages visited (lateral aggregate below). */
+  pageCount: number;
+  /** Page of the FIRST event (lateral aggregate below). */
+  firstPage: string | null;
+  /** Page of the most recent event (lateral aggregate below). */
+  lastPage: string | null;
 }
 
 /** Page of visits for the given filters, newest-active-first. Offset
  *  pagination (not cursor/keyset) — simpler to reason about and this is an
  *  admin-only, low-volume list; a real product at scale would want keyset
  *  pagination on (lastAt, id) instead. `hasNext` comes from fetching one row
- *  past the page size rather than a separate COUNT(*) — cheap and avoids a
- *  full-table count. */
+ *  past the page size rather than a separate COUNT(*).
+ *
+ *  Each row is enriched with event/page aggregates via a LATERAL join — one
+ *  extra lookup per row, kept cheap by the Event `(visitId, at)` index. */
 export async function listVisits(
   filters: VisitFilters,
   page: number,
@@ -123,8 +155,18 @@ export async function listVisits(
   const rows = await prisma.$queryRaw<VisitListItem[]>`
     SELECT
       v.id, v."siteId", v."firstAt", v."lastAt", v.device, v.os,
-      v.country, v.region, v.city, v.email, v.theme, v.from, v.ref
+      v.country, v.region, v.city, v.lang, v.email, v.theme, v.from, v.ref, v.app,
+      v."client", v."meta", v."mergeCount",
+      e."eventCount", e."pageCount", e."firstPage", e."lastPage"
     FROM "Visit" v
+    LEFT JOIN LATERAL (
+      SELECT count(*)::int AS "eventCount",
+             count(DISTINCT "page")::int AS "pageCount",
+             (array_agg("page" ORDER BY at ASC))[1] AS "firstPage",
+             (array_agg("page" ORDER BY at DESC))[1] AS "lastPage"
+      FROM "Event"
+      WHERE "visitId" = v.id
+    ) e ON true
     WHERE ${where}
     ORDER BY v."lastAt" DESC
     LIMIT ${PAGE_SIZE + 1} OFFSET ${offset}
@@ -141,3 +183,74 @@ export async function getVisitDetail(id: string): Promise<{ visit: Visit; events
   return { visit, events };
 }
 
+/** Site-level numeric summary for the dashboard header. Deliberately NOT
+ *  chart data — four scalar counts, rolling windows, timezone-free, scoped to
+ *  the selected client lens. */
+export interface SiteSummary {
+  visits24h: number;
+  events24h: number;
+  emails7d: number;
+  liveNow: number;
+}
+
+interface SummaryRow {
+  visits24h: number;
+  events24h: number;
+  emails7d: number;
+  liveNow: number;
+}
+
+export async function getSiteSummary(siteId: string, client: string, now: Date): Promise<SiteSummary> {
+  const d24 = new Date(now.getTime() - 24 * 3600_000);
+  const d7 = new Date(now.getTime() - 7 * 24 * 3600_000);
+  const d5 = new Date(now.getTime() - 5 * 60_000);
+  const c = clientPredicate("v", client);
+  const rows = await prisma.$queryRaw<SummaryRow[]>`
+    SELECT
+      (SELECT count(*)::int FROM "Visit" v
+         WHERE v."siteId" = ${siteId} AND v."firstAt" >= ${d24} AND ${c}) AS "visits24h",
+      (SELECT count(*)::int FROM "Event" e JOIN "Visit" v ON v.id = e."visitId"
+         WHERE v."siteId" = ${siteId} AND e.at >= ${d24} AND ${c}) AS "events24h",
+      (SELECT count(DISTINCT email)::int FROM "Visit" v
+         WHERE v."siteId" = ${siteId} AND email IS NOT NULL AND v."firstAt" >= ${d7} AND ${c}) AS "emails7d",
+      (SELECT count(*)::int FROM "Visit" v
+         WHERE v."siteId" = ${siteId} AND v."lastAt" >= ${d5} AND ${c}) AS "liveNow"
+  `;
+  return rows[0] ?? { visits24h: 0, events24h: 0, emails7d: 0, liveNow: 0 };
+}
+
+/** A ranked breakdown entry, e.g. "Pricing" → 214. Rendered as a plain list,
+ *  not a chart (this panel is deliberately chart-free). */
+export interface RankedItem {
+  label: string;
+  count: number;
+}
+
+export async function getTopPages(siteId: string, client: string, now: Date): Promise<RankedItem[]> {
+  const d7 = new Date(now.getTime() - 7 * 24 * 3600_000);
+  const c = clientPredicate("v", client);
+  const rows = await prisma.$queryRaw<Array<{ page: string; cnt: number }>>`
+    SELECT e.page, count(*)::int AS cnt
+    FROM "Event" e
+    JOIN "Visit" v ON v.id = e."visitId"
+    WHERE v."siteId" = ${siteId} AND e.at >= ${d7} AND ${c}
+    GROUP BY e.page
+    ORDER BY cnt DESC, e.page ASC
+    LIMIT 8
+  `;
+  return rows.map((r) => ({ label: r.page, count: r.cnt }));
+}
+
+export async function getTopCountries(siteId: string, client: string, now: Date): Promise<RankedItem[]> {
+  const d7 = new Date(now.getTime() - 7 * 24 * 3600_000);
+  const c = clientPredicate("v", client);
+  const rows = await prisma.$queryRaw<Array<{ country: string; cnt: number }>>`
+    SELECT v.country, count(*)::int AS cnt
+    FROM "Visit" v
+    WHERE v."siteId" = ${siteId} AND v."firstAt" >= ${d7} AND ${c}
+    GROUP BY v.country
+    ORDER BY cnt DESC, v.country ASC
+    LIMIT 8
+  `;
+  return rows.map((r) => ({ label: r.country, count: r.cnt }));
+}

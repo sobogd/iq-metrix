@@ -1,13 +1,11 @@
-name: Deploy to Prod (release)
+name: Deploy to Prod
 
-# Mirrors the push->release pattern used by translator/transcribe/money in
-# this workspace. File only for now: nothing points at this service yet
-# (see README), and pushing is deliberately left for a later task, so this
-# workflow has never actually run.
+# Deploys on every push to `main` (the only branch — the old `release` deploy
+# branch was removed). Manual runs via workflow_dispatch.
 
 on:
   push:
-    branches: [release]
+    branches: [main]
   workflow_dispatch:
 
 jobs:

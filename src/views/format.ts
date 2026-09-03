@@ -22,6 +22,19 @@ export function fmtShortDateTime(d: Date): string {
   return `${dd}.${mm} ${hh}:${mi}`;
 }
 
+/** Human duration between two timestamps: "42s", "3m", "1h 12m", "2d 4h". */
+export function fmtDuration(from: Date, to: Date): string {
+  const ms = Math.max(0, to.getTime() - from.getTime());
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
 /** Flag emoji from a 2-letter ISO country code via the Unicode regional
  *  indicator trick. "XX" (this service's own default for "unknown") and
  *  anything else non-ISO-shaped falls back to a globe. */
@@ -101,7 +114,11 @@ export function coerceMeta(raw: unknown): Record<string, string> {
  * ingest sanitizer already filters against the same registry — but this is
  * read-time code, not the same request) fall back to showing the raw key.
  */
-export function renderMetaChips(meta: Record<string, string>, registry: MetaKeysRegistry): string {
+export function renderMetaChips(
+  meta: Record<string, string>,
+  registry: MetaKeysRegistry,
+  linkable = true,
+): string {
   const entries = Object.entries(meta);
   if (entries.length === 0) return `<span class="muted">—</span>`;
   return entries
@@ -109,7 +126,7 @@ export function renderMetaChips(meta: Record<string, string>, registry: MetaKeys
       const cfg = registry[key];
       const label = typeof cfg?.label === "string" ? cfg.label : key;
       const text = `${escapeHtml(label)}: ${escapeHtml(value)}`;
-      if (typeof cfg?.link === "string" && cfg.link.includes("{v}")) {
+      if (linkable && typeof cfg?.link === "string" && cfg.link.includes("{v}")) {
         const href = cfg.link.replace("{v}", encodeURIComponent(value));
         return `<a class="chip" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
       }

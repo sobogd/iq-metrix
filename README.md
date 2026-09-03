@@ -1,55 +1,248 @@
 # iq-metrix
 
-Standalone cookieless analytics backend + admin. Replaces the duplicated
-analytics-v2 pipelines currently living inside the `iq-rest` monorepo
-(`apps/dashboard-api/src/analytics-v2/**`) and the `translator` product
-(`lib/analytics/**`), as one shared service both will eventually send data
-to.
+Standalone cookieless analytics backend + admin for the IQ Rest products. One
+shared service that the landing, the dashboard, translator and iq-mermaid all
+send events to — replacing the duplicated `analytics-v2` pipelines that used to
+live inside `iq-rest` (`apps/dashboard-api/src/analytics-v2/**`) and
+`translator` (`lib/analytics/**`).
 
-This repo is self-contained: nothing outside it points here yet. Wiring
-iq-rest/translator to call `/ingest` is a separate, later task.
+**Status: live in production.** The service is deployed behind nginx, all four
+domains resolve, and the consumers below are already wired to it. Admin UI:
+<https://iq-metrix.iq-rest.com>.
 
-Stack: Node 22, TypeScript, Fastify, Prisma, Postgres. Server-rendered HTML
-via plain template functions — no React/Next/build step/UI framework. One
-CSS file. pm2 in production.
+## Stack
 
-Intended prod: port `8205`, domain `iq-metrix.iq-rest.com`. DNS / nginx /
-certbot for that domain are out of scope here and done separately — see the
-comment in `src/routes/ingest.ts` about the `location /ingest { return 404;
-}` block that must be added once nginx exists, since the shared-secret header
-is this route's only protection until then.
+Node 22, TypeScript, Fastify, Prisma, PostgreSQL. Server-rendered HTML via plain
+template functions — no React/Next/build step/UI framework, no client JS at all.
+One CSS file (`public/style.css`). pm2 in production (fork mode, **single
+instance** — the salt cache/rotation lock and the rate limiter are in-process
+state).
 
-## Scope of what's built so far
+## Repo layout
 
-Data layer, `/ingest`, admin login, the visit-list/detail admin UI, a seed
-script for the two real sites, and a one-time history-import script from
-iq-rest's and translator's own analytics tables. Nothing outside this repo
-points here yet — wiring iq-rest/translator to actually call `/ingest`, and
-running the import against their PROD databases, are both separate, later
-tasks.
+```
+src/
+  routes/        ingest.ts, public-e.ts, login.ts, home.ts, visit-detail.ts, robots.ts
+  lib/           salt.ts, session-hash.ts, visit.ts, visit-token.ts,
+                 request-facts.ts, meta-sanitizer.ts, visit-queries.ts, …
+  views/         server-rendered HTML templates (layout, login, visit list/detail)
+  server.ts, env.ts, db.ts
+prisma/          schema.prisma, migrations/, seed.ts
+public/style.css
+scripts/import-history.ts        one-time history backfill (not part of the app)
+ecosystem.config.js              pm2 process definition
+.github/workflows/deploy.yml     push-to-main deploy
+```
+
+## Data model (`prisma/schema.prisma`)
+
+| Model | Purpose |
+| --- | --- |
+| `Site` | One row per source product (`iq-rest`, `iq-translate`, `iq-mermaid`). Holds `domain` and the registry of allowed `meta` keys (`metaKeys`). |
+| `AnalyticsSalt` | Singleton-per-site (`id = "current"`) holding the active hash salt. Rotated daily at 04:00 Europe/Madrid. |
+| `Visit` | One row = one **visit**: a device hash plus an identity, cut after 30 minutes of silence. Multi-tenant (`siteId`). |
+| `Event` | Minimal event rows (page/action/name triple); device/geo/source live on the visit. |
+
+Key design decisions (vs. the two reference pipelines this was ported from):
+
+- **Multi-tenant** — every query is scoped by `siteId`; each site has its own
+  salt row. There is no single global salt/visit space.
+- **One identity field** — a single `email`, instead of iq-rest's
+  `userId`/`restaurantId` split or translator's `email` + `topicId`.
+- **Generic `meta` Json bag** for custom per-site fields (restaurantId, topicId,
+  plan, …), validated against the site's `metaKeys` registry.
+- **`from` / `ref` / `theme`** keep their own dedicated `Visit` columns with
+  first-write-wins semantics, exactly like the references. They are the only
+  three reserved keys that bypass the `metaKeys` allowlist and never land in the
+  stored `meta` blob (they are pulled out and written to the dedicated columns).
+- **No ad/click-id handling** — `FBCLID`/`GCLID` capture was not ported (that
+  feature is removed from both source products). Click-id fields a client still
+  sends are simply ignored.
+- **Client classification** — the visit's UA is classified at ingest into
+  `human` / `search` / `ai` / `bot` (`Visit.client`; the raw UA is never
+  stored). Only server-side scripts (curl/axios/headless) are dropped.
+
+## Endpoints
+
+### `POST /ingest` — service-to-service
+
+The relay path. Auth is the `X-Ingest-Key` header (a constant shared secret per
+deployment), not a session — this is a server-to-server call from a relay inside
+a source product, never a browser. Body: `site`, `ip`, `ua`, optional
+`headers`/`email`/`app`/`meta`/`tok`, and an `events` array (≤ 50, each a
+`page`/`action`/`name` triple with optional `locale`/`meta`/`at`). Returns
+`{ tok }` — a fresh visit-continuation token.
+
+Attribution (`from`/`ref`/`theme`) arrives as **reserved keys inside `meta`**
+(visit-level and/or per-event) — there is no separate `ctx` object on this
+contract.
+
+### `POST /e` (+ `OPTIONS /e`) — browser
+
+Public browser-facing ingest, posting **directly** from the visitor's page rather
+than through a relay. CORS is resolved against a fixed `ORIGIN_TABLE` (origin →
+site/app), never a client-supplied field — an unknown or missing `Origin` is
+rejected with 403, and the reflected `Access-Control-Allow-Origin` always comes
+from that table (no wildcard, since `Access-Control-Allow-Credentials` forbids
+one anyway).
+
+Identity is attribution-only: for the iq-rest origins the UI-readable `iqr_email`
+cookie (set on the `.iq-rest.com` apex) rides along and is read for attribution;
+a forged cookie can only mis-attribute the forger's own traffic. translator and
+mermaid are different eTLD+1s (or have no accounts), so their events land
+anonymous by construction.
+
+Wire format is each caller's existing client **unchanged** — only the target
+origin moved. Two details are load-bearing: the opaque `/e` path (readable
+"track"-style paths are on ad-blocker lists) and a `text/plain` body (keeps the
+POST CORS-*simple*, so no preflight, and it is the only type `sendBeacon` can
+carry). Attribution arrives via a `ctx` object here (the browser clients'
+existing shape) as well as per-event `meta`. Returns `{ v: tok }` — matching the
+old dashboard-api `/api/e` response shape the clients were already built
+against, so the clients needed zero changes beyond their target URL.
+
+### Admin
+
+- `GET /login`, `POST /login` (rate-limited 5/min), `POST /logout` — one admin
+  account, scrypt password hash, HMAC-signed `mtx_sess` cookie.
+- `GET /` — visit list.
+- `GET /visits/:id` — visit detail.
+- `GET /robots.txt`, `GET /style.css`.
+
+## Cookieless mechanics
+
+The core of the service, ported from the two references and made multi-tenant:
+
+- **Daily salt rotation** (`lib/salt.ts`) — `sessionHash` is
+  `sha256(salt | network | ua | entropy)`; the salt rotates at 04:00 Madrid and
+  the previous one is destroyed by the overwrite, which is what makes hashes
+  unlinkable across salt-days. Rotation is lazy-on-read, cached in-process.
+- **Network coarsening** (`lib/request-facts.ts`) — the hash uses the network,
+  not the exact IP: IPv4 keeps the /24, IPv6 the /64 (so a phone's rotating
+  IPv6 low bits don't split one visitor into many visits). Extra entropy from
+  the full Accept-Language header + geo splits people sharing an ip+ua behind a
+  NAT. The raw IP lives only on the stack frame — never persisted or logged.
+- **Visit dedup** (`lib/session-hash.ts`) — `visitKey = sha256(hash | email |
+  start-minute)`; the start-minute bucket makes racing "start a visit" requests
+  converge on one row.
+- **Visit lifecycle** (`lib/visit.ts`) — resolve/continue/fold/promote: an
+  anonymous row is promoted in place when an email resolves (pre-identification
+  events stay on the row), and a stray anonymous row is folded into the
+  signed-in one. Idle window is 30 minutes.
+- **Continuation token** (`lib/visit-token.ts`) — the ingest response hands back
+  an HMAC-signed `<visitId>.<iat>.<hmac>`; echoing it pins later batches to the
+  same visit when the device hash flaps mid-visit (mobile network prefix / geo
+  changing between requests). Clients keep it only in page memory, never in any
+  storage.
+- **Attribution** — `from`/`ref`/`theme` are first-write-wins, enforced by
+  race-safe `WHERE <field> IS NULL` updates; the `app`/`meta` snapshot is
+  deliberately latest-wins.
+- **Meta sanitizer** (`lib/meta-sanitizer.ts`) — only keys registered in the
+  site's `metaKeys` are kept, capped at 8 keys / 32-char key / 128-char value; a
+  bad key is dropped, not fatal. `from`/`ref`/`theme` are reserved across every
+  site.
+- **Client classification** (`lib/client-kind.ts`) — the UA is classified into
+  `human` / `search` / `ai` / `bot` at ingest; only server-side scripts
+  (curl/axios/headless) are dropped, everything else is stored so crawler and
+  AI-agent traffic can be measured and filtered.
+
+## Admin UI
+
+Server-rendered HTML, zero client JS, mobile-first. A sticky topbar shows one
+horizontally-scrollable nav link per site (each site is its own page via
+`?site=`), plus sign-out.
+
+The dashboard is deliberately chart-free. Above the list it shows a numeric
+summary strip (visits / events in the last 24h, distinct identified emails in
+the last 7d, and "live now") and two ranked lists — top pages and top countries
+over 7d — both computed with plain `GROUP BY` aggregates in
+`src/lib/visit-queries.ts`. Quick date presets (`1d`/`7d`/`30d`/`All`) set the
+list window in one tap.
+
+The visit list is two-line rows: identity (email or "Anonymous") + app badge on
+the first line, device/os/theme icons + event count + distinct pages + visit
+duration + entry→exit pages + city + locale on the second, plus meta chips,
+folded-anonymous count and attribution when present. Non-human traffic carries
+a search/AI/bot badge. Filters (`app`, `client` — human/search/AI/bot/all,
+defaulting to human, date range, `email`, and one free meta key+value) go
+through a plain `<form method=get>`; pagination is plain
+`<a href>` links, offset-based (30/page), with `hasNext` from fetching one row
+past the page size rather than a `COUNT(*)`. The free meta filter accepts both
+`?meta.<key>=<value>` (canonical, what pagination links emit) and the form's
+`metaKey`/`metaValue` pair.
+
+Visit detail is a separate page (not a `<dialog>` — that would need client JS).
+Meta chips are rendered generically from the current site's `Site.metaKeys`
+registry; a key with a `{v}` link template renders as an external link to the
+source product's own admin, everything else as plain text. The meta filter on
+the list uses a hand-added expression index (`meta->>'restaurantId'`), so it
+only matches visits touched by a real `/ingest` call — imported history leaves
+`Visit.meta` empty by design.
+
+## Who sends data here
+
+| Product | Path | Identity |
+| --- | --- | --- |
+| iq-rest landing | `POST https://e.iq-rest.com/e` (browser, direct) | `iqr_email` cookie (same-site) |
+| iq-rest dashboard-web | `POST https://e.iq-rest.com/e` (browser, direct) | `iqr_email` cookie (same-site) |
+| translator | `POST https://e.iq-translate.com/e` (browser, direct) | anonymous (cross-site; cookie can't ride along) |
+| translator — server-fired sign-in/register | `POST http://127.0.0.1:8205/ingest` (relay) | email resolved server-side |
+| iq-mermaid | `POST https://e.iq-mermaid.com/e` (browser, direct) | anonymous (no accounts) |
+
+The browser clients live in the consumer repos, not here:
+`iq-rest/apps/landing/lib/analytics.ts`, `iq-rest/apps/dashboard-web/src/lib/analytics.ts`,
+`translator/lib/analytics.ts`, `mermaid/lib/analytics.ts`. translator's relay is
+`translator/lib/analytics/ingest.ts` (forward-with-timeout + on-disk spool, so a
+transient outage never loses an event). dashboard-api's own analytics-v2 relay
+was removed — its `src/analytics-v2` directory is empty; the iq-rest browser apps
+now hit `/e` directly.
+
+## Production / infra
+
+- Port **8205**. Admin domain **`iq-metrix.iq-rest.com`**.
+- DNS (all four → `46.225.143.221`, the shared prod box):
+  `iq-metrix.iq-rest.com`, `e.iq-rest.com`, `e.iq-translate.com`, `e.iq-mermaid.com`.
+- **nginx 1.18** (Ubuntu) fronts the service with a Let's Encrypt cert.
+- **`/ingest` is blocked at nginx** (public `POST /ingest` → nginx 404), so it
+  is reachable only on `127.0.0.1:8205` where the relays call it; the
+  `X-Ingest-Key` shared secret is the localhost-path defense.
+- The `e.*` vhosts expose **only `/e`** — the admin UI is not reachable there
+  (`e.iq-rest.com/login` → 404). The admin UI lives on `iq-metrix.iq-rest.com`
+  only.
+- **Deploy** — `.github/workflows/deploy.yml` runs on every push to `main`
+  (the only branch; the old `release` branch was removed): Node 22, `npm ci` →
+  typecheck → build → scp `dist/` + `prisma/` + `public/` +
+  `ecosystem.config.js` to the server → write `.env` from GH secrets →
+  `prisma migrate deploy` + `prisma generate` → `pm2 restart iq-metrix`
+  (or `pm2 start ecosystem.config.js`).
 
 ## Running locally
 
 ```bash
 npm install
-cp .env.example .env       # fill in the values below
+cp .env.example .env       # fill in the values (see Env vars)
 createdb iq_metrix          # or point DATABASE_URL at any local Postgres
-npx prisma migrate deploy   # applies prisma/migrations/**, hand-edited — see below
-npx prisma db seed          # creates the iq-rest / iq-translate Site rows (idempotent)
-npm run dev                  # tsx watch, http://localhost:8205
+npx prisma migrate deploy   # applies prisma/migrations/**
+npx prisma db seed          # creates the iq-rest / iq-translate / iq-mermaid Site rows (idempotent)
+npm run dev                 # tsx watch, http://localhost:8205
 ```
 
-Sign in at `/login` with `ADMIN_USER`/the plaintext password behind
-`ADMIN_PASSWORD_HASH`, then `/` shows the visit list (empty until something
-calls `/ingest`, or you run the history import below).
+Sign in at `/login` with `ADMIN_USER` / the plaintext password behind
+`ADMIN_PASSWORD_HASH`; `/` then shows the visit list (empty until something calls
+`/e` or `/ingest`, or you run the history import).
 
 Other scripts:
 
 ```bash
 npm run typecheck   # tsc --noEmit
 npm run build        # tsc -> dist/ + prisma generate
-npm start             # node dist/server.js (what pm2 runs in prod)
+npm start             # node --env-file=.env dist/server.js (what pm2 runs in prod)
 ```
+
+> The `mtx_sess` cookie is set with `Secure`. Chromium treats
+> `http://localhost` as a secure context, so login works there in local dev
+> without TLS; Firefox does not make that exception — use Chrome/Edge locally, or
+> test login against the deployed service.
 
 ## Env vars (see `.env.example`)
 
@@ -57,12 +250,12 @@ npm start             # node dist/server.js (what pm2 runs in prod)
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string |
 | `PORT` | default `8205` |
-| `INGEST_SHARED_SECRET` | required `X-Ingest-Key` header value on `POST /ingest`; also used to sign the visit-continuation token (`tok`) — see `src/lib/visit-token.ts` |
+| `INGEST_SHARED_SECRET` | required `X-Ingest-Key` value on `POST /ingest`; also signs the visit-continuation token (`src/lib/visit-token.ts`) |
 | `ADMIN_USER` | admin login username |
-| `ADMIN_PASSWORD_HASH` | scrypt hash, format `<salt-hex>:<derived-hex>` — generate with the one-liner below, never store a plaintext password |
+| `ADMIN_PASSWORD_HASH` | scrypt hash, format `<salt-hex>:<derived-hex>` (never store a plaintext password) |
 | `SESSION_SECRET` | HMAC key for the `mtx_sess` admin session cookie |
 
-Generate `ADMIN_PASSWORD_HASH`:
+Generate the password hash:
 
 ```bash
 node -e "const c=require('crypto');const s=c.randomBytes(16).toString('hex');console.log(s+':'+c.scryptSync(process.argv[1],s,64).toString('hex'))" 'your-password-here'
@@ -74,144 +267,30 @@ Generate a random secret (`INGEST_SHARED_SECRET` / `SESSION_SECRET`):
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Note on the `mtx_sess` cookie: it is set with `Secure`, so it only survives
-over HTTPS — except that Chromium-based browsers treat `http://localhost` as
-a secure context, so login works there in local dev without any TLS setup.
-Firefox does not make that exception; use Chrome/Edge for local testing, or
-test the login flow after this service is actually deployed behind nginx.
+## History import
 
-## Data model
+`scripts/import-history.ts` — one-time backfill from iq-rest's/translator's own
+`sessions_new`/`events_new` tables into this service's `Visit`/`Event`.
+Standalone (run via `npx tsx scripts/import-history.ts --site=iq-rest` or
+`--site=iq-translate`), not part of the server and not wired into any npm script
+or CI. mermaid has no old analytics tables, so there is nothing to import for it.
 
-See `prisma/schema.prisma`: `Site` (one row per source product, e.g.
-`iq-rest` / `iq-translate`, holding the registry of allowed `meta` keys),
-`AnalyticsSalt` (daily-rotating hash salt, per site), `Visit`, `Event`.
+Reads the source DB with a plain `pg` client and raw SQL (deliberately does not
+depend on either product's own Prisma client/schema). Idempotent — it reuses the
+source row's own `id`/`visitKey`, so a rerun's `createMany({ skipDuplicates:
+true })` no-ops on rows already imported. Source DB defaults to each product's
+local dev database; override with `SOURCE_DATABASE_URL` for a prod cutover run.
 
-Ported from (read, don't confuse with a dependency — nothing here imports
-from either):
-- `iq-rest/apps/dashboard-api/src/analytics-v2/{salt.service.ts,session-hash.ts,visit-token.ts,request-facts.ts,visit.service.ts}`
-- `translator/lib/analytics/{salt.ts,session-hash.ts,visit-token.ts,request-facts.ts,visit.ts}`
+## Migration note
 
-Key differences from both references (see file-level comments in
-`src/lib/**` for the reasoning): multi-tenant (`siteId` on every query, not
-a single global salt/visit space), one `email` identity field instead of a
-hardcoded `userId`/`restaurantId` split or `email`+`topicId`, a generic
-`meta` Json bag for custom per-site fields, and no ad/click-id handling at
-all (that feature is being removed from both source products separately).
-
-`from` / `ref` / `theme` keep their own dedicated `Visit` columns and
-first-write-wins semantics exactly like both references — only the
-transport changed. The `/ingest` contract has no separate `ctx` object, so
-these three are reserved keys inside the existing `meta` object instead
-(visit-level and/or per-event): every site accepts them regardless of its
-own `metaKeys` registry, they don't count against the per-call 8-key cap,
-and they never end up stored in the `meta` Json blob — `routes/ingest.ts`
-pulls them out (`meta-sanitizer.ts`'s `extractAttribution`, validated with
-`FROM_REGEX`/`HOST_REGEX`/`THEME_REGEX` ported verbatim from iq-rest's
-`track-v2.controller.ts`) and writes them into `Visit.from`/`ref`/`theme` via
-`visit.ts`'s `applyAttribution`, guarded by an `is null` check in the update
-itself so a value already set is never clobbered by a later event.
-
-### Migration
-
-Prisma cannot express a GIN index or an expression btree index on a Json
-column. The initial migration
-(`prisma/migrations/<timestamp>_init/migration.sql`) was generated with
-`prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma
---script` (the non-interactive equivalent of `migrate dev` — this workspace's
-agent sessions have no TTY, so `migrate dev` cannot be used) and then
-hand-edited to append:
+Prisma cannot express a GIN index or an expression btree index on a Json column,
+so the initial migration (`prisma/migrations/**/migration.sql`) was generated
+with `prisma migrate diff` and then hand-edited to append:
 
 ```sql
 CREATE INDEX "Visit_meta_gin_idx" ON "Visit" USING GIN ("meta" jsonb_path_ops);
 CREATE INDEX "Visit_meta_restaurantId_idx" ON "Visit" ((("meta"->>'restaurantId')));
 ```
 
-Applied and verified against a local Postgres database during development
-(`npx prisma migrate deploy`, then confirmed both indexes exist via `\d
-"Visit"`). Any future schema change should follow the same
-diff-then-hand-edit flow rather than `migrate dev`.
-
-## `POST /ingest`
-
-The only write path. See the type-level contract and inline comments in
-`src/routes/ingest.ts`. Auth is the `X-Ingest-Key` header (constant per
-deployment, not per-request), not a session — this is a service-to-service
-call from a relay that will live inside each source product (built in a
-later task), never called from a browser.
-
-## Admin UI
-
-`GET /` (visit list) and `GET /visits/:id` (visit detail) — server-rendered
-HTML, no client JS anywhere. Filters (site/app/date range/email/one free
-meta key+value) go through a plain `<form method=get>`; pagination is plain
-`<a href>` links. Offset pagination (`?page=N`, 30/page), not cursor —
-simpler, and this list is admin-only and low-volume; a real product at scale
-would want keyset pagination on `(lastAt, id)` instead. `hasNext` comes from
-fetching one row past the page size rather than a separate `COUNT(*)`.
-
-Visit detail is a separate page, not a `<dialog>` opened from the row — see
-the comment at the top of `src/views/visit-detail-page.ts`. A `<dialog>`
-needs at least a little client JS to open (`.showModal()`, or the very new
-popover/command-invoker attributes); a plain link needs none, and gets a
-real bookmarkable/shareable URL and the browser's own back button for free.
-
-Meta chips (on both pages) are rendered generically from the current site's
-`Site.metaKeys` registry — nothing in the view code hardcodes `restaurantId`
-or `topicId`. A key with a `{v}` link template renders as an external
-`target=_blank` link to the source product's own admin; anything else
-renders as plain text.
-
-The one free meta filter accepts either `?meta.<key>=<value>` directly in
-the URL (canonical, what pagination links emit) or the filter form's own
-`metaKey`+`metaValue` pair (a plain `<select>`+`<input>` can't rename its
-`name` to a dynamic `meta.<key>` without JS) — `src/routes/home.ts` accepts
-both. It filters on `Visit.meta` via the hand-added expression index
-(confirmed with `EXPLAIN` during development — see below), which only ever
-gets populated by a real `/ingest` call (`applyIngestSnapshot`); imported
-history (below) leaves `Visit.meta` empty by design, so this filter will not
-find restaurantId/topicId on historical visits, only on visits an actual
-`/ingest` call has touched since. Per-event `meta` (shown on the detail
-page) does not have this gap — the import script sets it directly.
-
-The 4 charts (visits/day last 30d, top countries, device breakdown, top
-pages) are inline `<svg>` bar charts computed from `GROUP BY` aggregates in
-`src/lib/visit-queries.ts`, rendered by `src/lib/svg-chart.ts` — no chart
-library. Each is a single-series magnitude comparison (one measure, ranked
-or over time), so one consistent accent hue with no legend is correct per
-the dataviz color-by-job rule; a multi-series chart would need the
-categorical palette instead. Every bar carries a native SVG `<title>` for a
-zero-JS hover tooltip.
-
-## History import
-
-`scripts/import-history.ts` — one-time backfill from iq-rest's/translator's
-own `sessions_new`/`events_new` tables into this service's `Visit`/`Event`.
-Standalone: run via `npx tsx scripts/import-history.ts --site=iq-rest` (or
-`--site=iq-translate`), not part of the server, not wired into any npm
-script or CI. Reads the source DB with a plain `pg` client and raw SQL
-against its known table shape — deliberately does not import either
-product's own Prisma client/schema.
-
-Idempotent: reuses the source row's own `id` and `visitKey` verbatim, so a
-rerun's `createMany({ skipDuplicates: true })` silently no-ops on every row
-already imported (verified locally — rerunning after a full import inserted
-0 further rows). Source DB defaults to each product's local dev database;
-override with `SOURCE_DATABASE_URL` (this is what a future prod cutover run
-would set — not done as part of this task, and the defaults baked in here
-are explicitly local-dev-only, never a prod connection string).
-
-Verified against both products' actual local dev databases: imported 10/10
-visits and 322/322 events from iq-rest, 5/5 visits and 135/135 events from
-translator, spot-checked the mapped rows (including a `theme` value and the
-per-event `restaurantId`/`topicId` -> `meta` mapping) against the source
-data, and confirmed the query layer's meta filter actually uses
-`Visit_meta_restaurantId_idx` via `EXPLAIN`.
-
-## Deploy
-
-`.github/workflows/deploy.yml` mirrors this workspace's push-to-`release`
-pattern (see `translator`/`money`). It has never run — nothing has been
-pushed. `ecosystem.config.js` is the pm2 process definition used on the
-server (fork mode, single instance — the salt cache and rate limiter are
-in-process state, so this must stay one process unless that's moved to a
-shared store).
+Any future schema change should follow the same diff-then-hand-edit flow rather
+than `migrate dev` (this workspace's agent sessions have no TTY).

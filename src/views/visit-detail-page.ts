@@ -1,6 +1,6 @@
 import type { Event, Site, Visit } from "@prisma/client";
 import { escapeHtml, renderLayout } from "./layout";
-import { asMetaKeysRegistry, coerceMeta, countryEmoji, deviceEmoji, fmtDateTime, renderMetaChips } from "./format";
+import { asMetaKeysRegistry, coerceMeta, countryEmoji, deviceEmoji, fmtDateTime, fmtDuration, renderMetaChips } from "./format";
 
 // Separate page (GET /visits/:id), not a <dialog> opened from the list row.
 // Picked over a dialog because this app has no client JS at all: a native
@@ -15,8 +15,10 @@ import { asMetaKeysRegistry, coerceMeta, countryEmoji, deviceEmoji, fmtDateTime,
 function topbar(): string {
   return `
 <header class="topbar">
-  <h1>📊 iq-metrix</h1>
-  <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+  <div class="topbar-inner">
+    <h1>📊 iq-metrix</h1>
+    <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+  </div>
 </header>`;
 }
 
@@ -64,6 +66,7 @@ export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site 
     kv("App", visit.app ? escapeHtml(visit.app) : "—"),
     kv("First seen", fmtDateTime(visit.firstAt)),
     kv("Last seen", fmtDateTime(visit.lastAt)),
+    kv("Duration", fmtDuration(visit.firstAt, visit.lastAt)),
     kv("Device", `${deviceEmoji(visit.device)} ${escapeHtml(visit.device ?? "—")}`),
     kv("OS", escapeHtml(visit.os ?? "—")),
     kv("Location", location),

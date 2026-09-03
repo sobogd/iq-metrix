@@ -6,7 +6,7 @@ import { sessionHash } from "../lib/session-hash";
 import { getSalt } from "../lib/salt";
 import { applyAttribution, applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
 import { signVisitToken, verifyVisitToken } from "../lib/visit-token";
-import { isBotUa } from "../lib/bot-filter";
+import { isScriptUa } from "../lib/client-kind";
 import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX } from "../lib/labels";
 import {
   type Attribution,
@@ -154,7 +154,7 @@ export async function publicIngestRoutes(fastify: FastifyInstance): Promise<void
     // never logged or stored, only hashed below (same discipline as /ingest).
     const facts: RawFacts = { ip: request.ip, ua, headers: request.headers as Record<string, string> };
 
-    if (isBotUa(ua)) return reply.send({});
+    if (isScriptUa(ua)) return reply.send({});
 
     const site = await prisma.site.findUnique({ where: { id: siteId } });
     if (!site) return reply.code(500).send({ error: "site not seeded" });

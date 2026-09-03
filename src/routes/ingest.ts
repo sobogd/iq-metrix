@@ -7,7 +7,7 @@ import { sessionHash } from "../lib/session-hash";
 import { getSalt } from "../lib/salt";
 import { applyAttribution, applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
 import { signVisitToken, verifyVisitToken } from "../lib/visit-token";
-import { isBotUa } from "../lib/bot-filter";
+import { isScriptUa } from "../lib/client-kind";
 import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX } from "../lib/labels";
 import {
   type Attribution,
@@ -145,10 +145,12 @@ export async function ingestRoutes(fastify: FastifyInstance): Promise<void> {
     const ua = typeof body.ua === "string" ? body.ua : "";
     const facts: RawFacts = { ip, ua, headers: parseHeaders(body.headers) };
 
-    // Cheap check, no DB: sheds scripted/crawler traffic before it costs a
-    // query. Silently accepted (200, no-op) rather than erroring, so as not
-    // to signal anything back to whatever sent it.
-    if (isBotUa(ua)) return reply.send({});
+    // Cheap check, no DB: sheds server-side scripts (curl/axios/headless)
+    // before they cost a query. Search/AI/other crawlers are NOT shed — they
+    // are stored with a `client` classification so the admin can measure them.
+    // Silently accepted (200, no-op) rather than erroring, so as not to
+    // signal anything back to whatever sent it.
+    if (isScriptUa(ua)) return reply.send({});
 
     const site = await prisma.site.findUnique({ where: { id: siteId } });
     if (!site) return reply.code(400).send({ error: "unknown site" });
