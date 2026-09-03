@@ -1,0 +1,86 @@
+import { escapeHtml } from "./layout";
+
+// Small, dependency-free presentation helpers shared by the visit list and
+// visit detail pages. Emoji instead of icon fonts, per the project's CSS
+// approach (public/style.css) — kept here, not duplicated per view.
+
+export function fmtDateTime(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+/** Flag emoji from a 2-letter ISO country code via the Unicode regional
+ *  indicator trick. "XX" (this service's own default for "unknown") and
+ *  anything else non-ISO-shaped falls back to a globe. */
+export function countryEmoji(code: string): string {
+  if (!/^[A-Za-z]{2}$/.test(code) || code.toUpperCase() === "XX") return "🌐";
+  return [...code.toUpperCase()].map((c) => String.fromCodePoint(127397 + c.charCodeAt(0))).join("");
+}
+
+export function deviceEmoji(device: string | null): string {
+  if (device === "mobile") return "📱";
+  if (device === "tablet") return "📟";
+  if (device === "desktop") return "🖥️";
+  return "❓";
+}
+
+/** A site's metaKeys registry, loosely typed — it's a Prisma Json column, so
+ *  this is the runtime shape we choose to trust after a typeof guard, not
+ *  something Prisma can validate for us. */
+export interface MetaKeyConfig {
+  label?: unknown;
+  link?: unknown;
+}
+export type MetaKeysRegistry = Record<string, MetaKeyConfig>;
+
+export function asMetaKeysRegistry(raw: unknown): MetaKeysRegistry {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as MetaKeysRegistry;
+}
+
+/** A Visit/Event `meta` Json column, coerced to the string-map shape the
+ *  ingest sanitizer guarantees it was written as (src/lib/meta-sanitizer.ts) —
+ *  defensively re-checked here rather than trusted blindly, since this is
+ *  read back out of the database, not the same request that validated it. */
+export function coerceMeta(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Meta chips, rendered generically from a site's metaKeys registry — this
+ * function never hardcodes a key name like "restaurantId"/"topicId". A key
+ * with a `link` template (containing a literal `{v}`) renders as an
+ * external link (target=_blank) to the source product's own admin; anything
+ * else renders as plain text. Unregistered keys (should not happen — the
+ * ingest sanitizer already filters against the same registry — but this is
+ * read-time code, not the same request) fall back to showing the raw key.
+ */
+export function renderMetaChips(meta: Record<string, string>, registry: MetaKeysRegistry): string {
+  const entries = Object.entries(meta);
+  if (entries.length === 0) return `<span class="muted">—</span>`;
+  return entries
+    .map(([key, value]) => {
+      const cfg = registry[key];
+      const label = typeof cfg?.label === "string" ? cfg.label : key;
+      const text = `${escapeHtml(label)}: ${escapeHtml(value)}`;
+      if (typeof cfg?.link === "string" && cfg.link.includes("{v}")) {
+        const href = cfg.link.replace("{v}", encodeURIComponent(value));
+        return `<a class="chip" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+      }
+      return `<span class="chip">${text}</span>`;
+    })
+    .join("");
+}
+
+export function truncate(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+}

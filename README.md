@@ -21,20 +21,25 @@ is this route's only protection until then.
 
 ## Scope of what's built so far
 
-Data layer + `/ingest` endpoint + admin login only, per the current task.
-**Not built yet:** the visit-list / analytics admin UI. `GET /` is currently
-just a login-gated placeholder that proves the auth flow works end to end —
-see `src/views/home-page.ts`.
+Data layer, `/ingest`, admin login, the visit-list/detail admin UI, and a
+seed script for the two real sites. Nothing outside this repo points here
+yet — wiring iq-rest/translator to actually call `/ingest` is a separate,
+later task.
 
 ## Running locally
 
 ```bash
 npm install
-cp .env.example .env      # fill in the values below
-createdb iq_metrix         # or point DATABASE_URL at any local Postgres
-npx prisma migrate deploy  # applies prisma/migrations/**, hand-edited — see below
-npm run dev                 # tsx watch, http://localhost:8205
+cp .env.example .env       # fill in the values below
+createdb iq_metrix          # or point DATABASE_URL at any local Postgres
+npx prisma migrate deploy   # applies prisma/migrations/**, hand-edited — see below
+npx prisma db seed          # creates the iq-rest / iq-translate Site rows (idempotent)
+npm run dev                  # tsx watch, http://localhost:8205
 ```
+
+Sign in at `/login` with `ADMIN_USER`/the plaintext password behind
+`ADMIN_PASSWORD_HASH`, then `/` shows the visit list (empty until something
+calls `/ingest`, or you run the history import below).
 
 Other scripts:
 
@@ -131,6 +136,49 @@ The only write path. See the type-level contract and inline comments in
 deployment, not per-request), not a session — this is a service-to-service
 call from a relay that will live inside each source product (built in a
 later task), never called from a browser.
+
+## Admin UI
+
+`GET /` (visit list) and `GET /visits/:id` (visit detail) — server-rendered
+HTML, no client JS anywhere. Filters (site/app/date range/email/one free
+meta key+value) go through a plain `<form method=get>`; pagination is plain
+`<a href>` links. Offset pagination (`?page=N`, 30/page), not cursor —
+simpler, and this list is admin-only and low-volume; a real product at scale
+would want keyset pagination on `(lastAt, id)` instead. `hasNext` comes from
+fetching one row past the page size rather than a separate `COUNT(*)`.
+
+Visit detail is a separate page, not a `<dialog>` opened from the row — see
+the comment at the top of `src/views/visit-detail-page.ts`. A `<dialog>`
+needs at least a little client JS to open (`.showModal()`, or the very new
+popover/command-invoker attributes); a plain link needs none, and gets a
+real bookmarkable/shareable URL and the browser's own back button for free.
+
+Meta chips (on both pages) are rendered generically from the current site's
+`Site.metaKeys` registry — nothing in the view code hardcodes `restaurantId`
+or `topicId`. A key with a `{v}` link template renders as an external
+`target=_blank` link to the source product's own admin; anything else
+renders as plain text.
+
+The one free meta filter accepts either `?meta.<key>=<value>` directly in
+the URL (canonical, what pagination links emit) or the filter form's own
+`metaKey`+`metaValue` pair (a plain `<select>`+`<input>` can't rename its
+`name` to a dynamic `meta.<key>` without JS) — `src/routes/home.ts` accepts
+both. It filters on `Visit.meta` via the hand-added expression index
+(confirmed with `EXPLAIN` during development — see below), which only ever
+gets populated by a real `/ingest` call (`applyIngestSnapshot`); imported
+history (below) leaves `Visit.meta` empty by design, so this filter will not
+find restaurantId/topicId on historical visits, only on visits an actual
+`/ingest` call has touched since. Per-event `meta` (shown on the detail
+page) does not have this gap — the import script sets it directly.
+
+The 4 charts (visits/day last 30d, top countries, device breakdown, top
+pages) are inline `<svg>` bar charts computed from `GROUP BY` aggregates in
+`src/lib/visit-queries.ts`, rendered by `src/lib/svg-chart.ts` — no chart
+library. Each is a single-series magnitude comparison (one measure, ranked
+or over time), so one consistent accent hue with no legend is correct per
+the dataviz color-by-job rule; a multi-series chart would need the
+categorical palette instead. Every bar carries a native SVG `<title>` for a
+zero-JS hover tooltip.
 
 ## Deploy
 

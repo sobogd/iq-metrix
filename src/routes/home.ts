@@ -1,14 +1,84 @@
 import type { FastifyInstance } from "fastify";
-import { env } from "../env";
-import { SESSION_COOKIE_NAME, verifySession } from "../lib/session-cookie";
-import { renderHomePage } from "../views/home-page";
+import { requireAdmin } from "../lib/auth-guard";
+import {
+  deviceBreakdown,
+  listSites,
+  listVisits,
+  toVisitFilters,
+  topCountries,
+  topPages,
+  visitsPerDay,
+  type QueryFilters,
+} from "../lib/visit-queries";
+import { renderNoSitesPage, renderVisitListPage } from "../views/visit-list-page";
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+/** Accepts either shape: a literal `meta.<key>=<value>` query param (the
+ *  canonical, bookmarkable/shareable form — also what pagination links on
+ *  this page emit, see visit-list-page.ts's buildLink), or the `metaKey`+
+ *  `metaValue` pair the filter form itself actually submits (a plain
+ *  <select>+<input> can't rename its `name` to a dynamic `meta.<key>`
+ *  without client JS, which this app deliberately has none of). */
+function parseMetaFilter(query: Record<string, unknown>): { key: string; value: string } | null {
+  for (const [k, v] of Object.entries(query)) {
+    if (k.startsWith("meta.") && typeof v === "string" && v) {
+      const key = k.slice("meta.".length);
+      if (key) return { key, value: v };
+    }
+  }
+  const metaKey = str(query.metaKey);
+  const metaValue = str(query.metaValue);
+  if (metaKey && metaValue) return { key: metaKey, value: metaValue };
+  return null;
+}
 
 export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get("/", async (request, reply) => {
-    const token = request.cookies[SESSION_COOKIE_NAME];
-    const user = verifySession(token, env.sessionSecret);
-    if (!user) return reply.redirect("/login");
+    const user = requireAdmin(request, reply);
+    if (!user) return;
+
+    const sites = await listSites();
     reply.type("text/html; charset=utf-8");
-    return reply.send(renderHomePage(user));
+    if (sites.length === 0) return reply.send(renderNoSitesPage());
+
+    const q = request.query as Record<string, unknown>;
+    const requestedSite = str(q.site);
+    const currentSite = sites.find((s) => s.id === requestedSite) ?? sites[0]!;
+    const meta = parseMetaFilter(q);
+    const page = Math.max(1, Number.parseInt(str(q.page), 10) || 1);
+
+    const raw: QueryFilters = {
+      site: currentSite.id,
+      app: str(q.app),
+      from: str(q.from),
+      to: str(q.to),
+      email: str(q.email),
+      metaKey: meta?.key ?? "",
+      metaValue: meta?.value ?? "",
+    };
+    const filters = toVisitFilters(raw);
+
+    const [{ items, hasNext }, vpd, countries, devices, pages] = await Promise.all([
+      listVisits(filters, page),
+      visitsPerDay(filters),
+      topCountries(filters),
+      deviceBreakdown(filters),
+      topPages(filters),
+    ]);
+
+    return reply.send(
+      renderVisitListPage({
+        sites,
+        currentSite,
+        raw,
+        items,
+        page,
+        hasNext,
+        charts: { visitsPerDay: vpd, topCountries: countries, deviceBreakdown: devices, topPages: pages },
+      }),
+    );
   });
 }

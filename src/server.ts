@@ -8,6 +8,7 @@ import { env } from "./env";
 import { ingestRoutes } from "./routes/ingest";
 import { loginRoutes } from "./routes/login";
 import { homeRoutes } from "./routes/home";
+import { visitDetailRoutes } from "./routes/visit-detail";
 import { robotsRoutes } from "./routes/robots";
 
 // Read once at boot, served from memory — the only static asset this
@@ -57,6 +58,7 @@ async function main(): Promise<void> {
   await fastify.register(robotsRoutes);
   await fastify.register(loginRoutes);
   await fastify.register(homeRoutes);
+  await fastify.register(visitDetailRoutes);
   await fastify.register(ingestRoutes);
 
   await fastify.listen({ port: env.port, host: "0.0.0.0" });
