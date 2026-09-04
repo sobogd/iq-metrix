@@ -37,7 +37,10 @@ function kv(label: string, value: string): string {
 function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysRegistry>): string {
   if (events.length === 0) return `<p class="muted">No events recorded.</p>`;
   const head = ["🕐 At", "📄 Page", "⚡ Action", "🏷️ Name", "🌐 Locale", "🧩 App", "Meta"]
-    .map((h) => `<span class="viz-cell">${h}</span>`)
+    .map((h, i) => {
+      const title = i === 0 ? ` title="Europe/Madrid time"` : "";
+      return `<span class="viz-cell"${title}>${h}</span>`;
+    })
     .join("");
   const rows = events
     .map(

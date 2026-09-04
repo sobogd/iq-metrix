@@ -152,32 +152,30 @@ Server-rendered HTML, zero client JS, mobile-first. A sticky topbar shows one
 horizontally-scrollable nav link per site (each site is its own page via
 `?site=`), plus sign-out.
 
-The dashboard is deliberately chart-free. Above the list it shows a numeric
-summary strip (visits / events in the last 24h, distinct identified emails in
-the last 7d, and "live now") and two ranked lists — top pages and top countries
-over 7d — both computed with plain `GROUP BY` aggregates in
-`src/lib/visit-queries.ts`. Quick date presets (`1d`/`7d`/`30d`/`All`) set the
-list window in one tap.
+The dashboard is deliberately chart-free, filter-free and ranking-free.
+Above the list, a numeric summary strip shows **today's scorecard**: visits,
+events and distinct identified emails all counted over the current Madrid
+calendar day (00:00–23:59, Europe/Madrid — the same clock the salt rotation
+is anchored to), plus "live now" (visits active in the last 5 minutes). No
+date presets, no filters, no top-page/top-country rankings — the page
+answers "how is today going", and the list below it is the raw drill-down.
+Both are computed in `src/lib/visit-queries.ts`; every timestamp in the
+admin (list rows, detail page, events table) renders on a Europe/Madrid
+clock regardless of the server's own timezone (`src/views/format.ts`).
 
 The visit list is two-line rows: identity (email or "Anonymous") + app badge on
 the first line, device/os/theme icons + event count + distinct pages + visit
 duration + entry→exit pages + city + locale on the second, plus meta chips,
-folded-anonymous count and attribution when present. Non-human traffic carries
-a search/AI/bot badge. Filters (`app`, `client` — human/search/AI/bot/all,
-defaulting to human, date range, `email`, and one free meta key+value) go
-through a plain `<form method=get>`; pagination is plain
-`<a href>` links, offset-based (30/page), with `hasNext` from fetching one row
-past the page size rather than a `COUNT(*)`. The free meta filter accepts both
-`?meta.<key>=<value>` (canonical, what pagination links emit) and the form's
-`metaKey`/`metaValue` pair.
+folded-anonymous count and attribution when present. All traffic is shown —
+human, search-engine, AI-agent and other-bot visits each carry their own
+search/AI/bot badge, with no client lens to hide any of it. Pagination is
+plain `<a href>` links, offset-based (30/page), with `hasNext` from fetching
+one row past the page size rather than a `COUNT(*)`.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 Meta chips are rendered generically from the current site's `Site.metaKeys`
 registry; a key with a `{v}` link template renders as an external link to the
-source product's own admin, everything else as plain text. The meta filter on
-the list uses a hand-added expression index (`meta->>'restaurantId'`), so it
-only matches visits touched by a real `/ingest` call — imported history leaves
-`Visit.meta` empty by design.
+source product's own admin, everything else as plain text.
 
 ## Who sends data here
 

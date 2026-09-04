@@ -4,8 +4,17 @@ import { escapeHtml } from "./layout";
 // visit detail pages. Emoji instead of icon fonts, per the project's CSS
 // approach (public/style.css) — kept here, not duplicated per view.
 
+// Every timestamp this admin shows is rendered on a Europe/Madrid clock,
+// regardless of the server's own timezone. (The DB stores UTC instants;
+// the ingest and salt logic were already Madrid-anchored — see lib/salt.ts —
+// and the admin UI now reads the same clock.) This also keeps the times
+// stable across a server whose TZ is UTC, as prod runs it.
+const MADRID_TZ = "Europe/Madrid";
+
+/** "04 Sep, 23:15" — Europe/Madrid, for the detail page / events table. */
 export function fmtDateTime(d: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
+    timeZone: MADRID_TZ,
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -13,13 +22,18 @@ export function fmtDateTime(d: Date): string {
   }).format(d);
 }
 
-/** dd.mm hh:mm — compact form for the visit list row. */
+/** dd.mm hh:mm — compact Europe/Madrid form for the visit list row. */
 export function fmtShortDateTime(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}.${mm} ${hh}:${mi}`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: MADRID_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("day")}.${get("month")} ${get("hour")}:${get("minute")}`;
 }
 
 /** Human duration between two timestamps: "42s", "3m", "1h 12m", "2d 4h". */

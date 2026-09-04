@@ -302,62 +302,6 @@ code {
   padding: 1px 5px;
 }
 
-/* ---------- Filter bar ---------- */
-
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-}
-
-.filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.filters input,
-.filters select {
-  font: inherit;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 7px 10px;
-  min-width: 0;
-}
-
-.filters input:focus,
-.filters select:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.filters button {
-  padding: 8px 14px;
-}
-
-.link-btn {
-  color: var(--muted);
-  text-decoration: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 14px;
-}
-
-.link-btn:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
 /* ---------- Visit list rows ---------- *
  *
  * One compact two-line row per visit: flag on the left, identity + app on
@@ -603,101 +547,13 @@ a.chip:hover {
   color: var(--accent-2);
 }
 
-/* ---------- Breakdown lists (ranked, no charts) ---------- */
-
-.breakdowns {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-@media (min-width: 720px) {
-  .breakdowns {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.breakdown {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-}
-
-.rank-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.rank-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
-}
-
-.rank-row:last-child {
-  border-bottom: none;
-}
-
-.rank-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rank-count {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ---------- Date presets ---------- */
-
-.presets {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.preset {
-  color: var(--muted);
-  text-decoration: none;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 13px;
-}
-
-.preset:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-.preset.active {
-  color: var(--text);
-  background: var(--panel-2);
-  border-color: var(--accent);
-}
-
 /* ---------- Mobile touch targets ---------- */
 
 @media (max-width: 720px) {
-  .preset,
-  .site-link,
-  .link-btn {
+  .site-link {
     min-height: 40px;
     display: inline-flex;
     align-items: center;
-  }
-
-  .filters button {
-    min-height: 44px;
-    width: 100%;
   }
 
   .dashboard {
