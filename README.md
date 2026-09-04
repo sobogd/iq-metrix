@@ -163,14 +163,18 @@ Both are computed in `src/lib/visit-queries.ts`; every timestamp in the
 admin (list rows, detail page, events table) renders on a Europe/Madrid
 clock regardless of the server's own timezone (`src/views/format.ts`).
 
-The visit list is two-line rows: identity (email or "Anonymous") + app badge on
-the first line, device/os/theme icons + event count + distinct pages + visit
-duration + entry→exit pages + city + locale on the second, plus meta chips,
-folded-anonymous count and attribution when present. All traffic is shown —
-human, search-engine, AI-agent and other-bot visits each carry their own
-search/AI/bot badge, with no client lens to hide any of it. Pagination is
-plain `<a href>` links, offset-based (30/page), with `hasNext` from fetching
-one row past the page size rather than a `COUNT(*)`.
+The visit list is one compact row per session, up to three short lines:
+the first shows location — flag + `Country · Region · City` — with the
+date/time and event count pinned to the right edge; the second is a row of
+colored text tags (no emoji): OS, device class (Mobile/Tablet/Desktop),
+app, from/via attribution, light/dark theme, language, duration, plus a
+`search`/`AI`/`bot` pill for non-human traffic; the third appears only for
+identified sessions and carries the email tag — anonymous rows get no
+identity line at all. All traffic is shown — human, search-engine,
+AI-agent and other-bot visits each carry their own pill, with no client
+lens to hide any of it. Pagination is plain `<a href>` links,
+offset-based (30/page), with `hasNext` from fetching one row past the page
+size rather than a `COUNT(*)`. The whole row links to the visit detail.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 Meta chips are rendered generically from the current site's `Site.metaKeys`

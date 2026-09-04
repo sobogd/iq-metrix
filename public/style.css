@@ -304,10 +304,16 @@ code {
 
 /* ---------- Visit list rows ---------- *
  *
- * One compact two-line row per visit: flag on the left, identity + app on
- * the primary line, device/os/theme icons + event count + duration + last
- * page on the secondary line, timestamp on the right. Works as a single
- * full-width list item on phone — no table/card switch needed.
+ * One compact row per session, up to three short lines:
+ *   line 1 — location: flag + country · region · city, with the
+ *            date/time and event count pinned to the right;
+ *   line 2 — colored TEXT tags (no emoji): OS, device class, app,
+ *            from/via source, theme, lang, duration, and a search/AI/bot
+ *            kind pill for non-human traffic;
+ *   line 3 — the email tag, only when the visit is identified — anonymous
+ *            sessions get no identity line at all.
+ * The whole row is one link to the visit detail page. Single full-width
+ * list item on phone; no table/card switch needed.
  */
 
 .visits {
@@ -317,111 +323,151 @@ code {
 }
 
 .visit-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 12px;
+  row-gap: 7px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 11px 13px;
   color: var(--text);
   text-decoration: none;
-  min-height: 58px;
 }
 
 .visit-row:hover {
   border-color: var(--accent);
 }
 
-.visit-main {
-  flex: 1 1 auto;
-  min-width: 0;
+/* Line 1 — location (left) + date/event count (right) */
+.visit-geo {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
 }
 
-.visit-id-line {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+.visit-flag {
+  flex: 0 0 auto;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.visit-location {
   font-weight: 600;
   font-size: 14px;
-}
-
-.visit-email {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 58vw;
-}
-
-.app-badge {
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--accent-2);
-  background: rgba(126, 224, 195, 0.12);
-  border: 1px solid rgba(126, 224, 195, 0.35);
-  border-radius: 6px;
-  padding: 3px 7px;
-}
-
-.visit-sub-line {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.visit-icons {
-  flex: 0 0 auto;
-}
-
-.visit-stats {
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
-.visit-time {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  padding-top: 2px;
-  color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.flag-wrap {
-  position: relative;
+.visit-meta {
   display: inline-flex;
-  flex: 0 0 auto;
-  font-size: 20px;
-  line-height: 1;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.flag-tooltip {
-  display: none;
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 6px;
+.visit-events {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+/* Lines 2–3 — tag rows (span the full row width) */
+.visit-tags,
+.visit-id {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* Colored text pills — device/OS/source/etc., no emoji */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 4px 9px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-email {
+  color: #b3ffe7;
+  font-weight: 600;
+  background: rgba(126, 224, 195, 0.12);
+  border: 1px solid rgba(126, 224, 195, 0.45);
+}
+
+.tag-os {
+  color: #c9adff;
+  background: rgba(183, 140, 255, 0.1);
+  border: 1px solid rgba(183, 140, 255, 0.36);
+}
+
+.tag-device {
+  color: #9cc2ff;
+  background: rgba(91, 140, 255, 0.12);
+  border: 1px solid rgba(91, 140, 255, 0.38);
+}
+
+.tag-app {
+  color: #8fd7ff;
+  background: rgba(91, 172, 255, 0.1);
+  border: 1px solid rgba(91, 172, 255, 0.36);
+}
+
+.tag-source {
+  color: #93eccf;
+  background: rgba(126, 224, 195, 0.1);
+  border: 1px solid rgba(126, 224, 195, 0.34);
+}
+
+.tag-theme-dark {
+  color: #b6c2de;
+  background: rgba(38, 47, 69, 0.5);
+  border: 1px solid var(--border);
+}
+
+.tag-theme-light {
+  color: #ffd98a;
+  background: rgba(246, 200, 95, 0.12);
+  border: 1px solid rgba(246, 200, 95, 0.4);
+}
+
+.tag-muted {
+  color: var(--muted);
   background: var(--panel-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 12px;
-  color: var(--text);
-  z-index: 10;
 }
 
-.flag-wrap:hover .flag-tooltip {
-  display: block;
+/* Non-human traffic pills (search/AI/bot) — humans get no pill */
+.client-search {
+  color: #f6c85f;
+  background: rgba(246, 200, 95, 0.1);
+  border: 1px solid rgba(246, 200, 95, 0.4);
+}
+
+.client-ai {
+  color: #ff9ec2;
+  background: rgba(255, 120, 170, 0.1);
+  border: 1px solid rgba(255, 120, 170, 0.4);
+}
+
+.client-bot {
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
 }
 
 /* ---------- Meta chips ---------- */
@@ -562,32 +608,3 @@ a.chip:hover {
   }
 }
 
-/* ---------- Client classification badges ---------- */
-
-.client-badge {
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  border-radius: 6px;
-  padding: 3px 7px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-}
-
-.client-search {
-  color: #f6c85f;
-  border-color: rgba(246, 200, 95, 0.4);
-  background: rgba(246, 200, 95, 0.1);
-}
-
-.client-ai {
-  color: #b78cff;
-  border-color: rgba(183, 140, 255, 0.4);
-  background: rgba(183, 140, 255, 0.1);
-}
-
-.client-bot {
-  color: var(--muted);
-  background: var(--panel-2);
-}

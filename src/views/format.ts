@@ -72,26 +72,6 @@ export function deviceEmoji(device: string | null): string {
   return "❓";
 }
 
-/** Device TYPE icon for the visit list row — only 3 states, per spec. */
-export function deviceTypeEmoji(device: string | null): string {
-  if (device === "desktop") return "💻";
-  if (device === "mobile") return "📱";
-  return "🔌";
-}
-
-/** OS icon for the visit list row — only 4 states, per spec (windows/macos
- *  fold into "unknown" alongside null/other). */
-export function osEmoji(os: string | null): string {
-  if (os === "android") return "🤖";
-  if (os === "ios") return "🍎";
-  if (os === "linux") return "🐧";
-  return "🎛️";
-}
-
-export function themeEmoji(theme: string | null): string {
-  return theme === "dark" ? "🌙" : "☀️";
-}
-
 /** A site's metaKeys registry, loosely typed — it's a Prisma Json column, so
  *  this is the runtime shape we choose to trust after a typeof guard, not
  *  something Prisma can validate for us. */
