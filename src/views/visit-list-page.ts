@@ -44,8 +44,8 @@ function renderSummary(s: SiteSummary): string {
 // ---------------------------------------------------------------------------
 // Compact visit rows — three short lines per session:
 //   line 1: flag + country · region · city ......... date/time + event count
-//   line 2: colored TEXT tags (no emoji): OS, device class, source
-//          (via referrer / from), theme, lang, duration
+//   line 2: colored TEXT tags (no emoji): OS, "Tablet" only when it really
+//          is one, source (via referrer / from), theme, lang, duration
 //   line 3: the email tag — only when the visit is identified; anonymous
 //          sessions get no line at all.
 // No app/landing label, no first page, no UA client classification — all of
@@ -58,12 +58,6 @@ const OS_LABELS: Record<string, string> = {
   linux: "Linux",
   ios: "iOS",
   android: "Android",
-};
-
-const DEVICE_LABELS: Record<string, string> = {
-  desktop: "Desktop",
-  mobile: "Mobile",
-  tablet: "Tablet",
 };
 
 const THEME_LABELS: Record<string, { text: string; cls: string }> = {
@@ -81,9 +75,12 @@ function osChip(os: string | null): string {
   return label ? chip("tag-os", label) : "";
 }
 
+/** Device-class chip — only "Tablet". Desktop/mobile are already implied
+ *  by the OS chip (Windows/macOS/Linux are always desktop; iOS/Android are
+ *  phone-sized by default), but a tablet keeps the same OS name, so the one
+ *  case worth calling out is when the visit really came from a tablet. */
 function deviceChip(device: string | null): string {
-  const label = device ? DEVICE_LABELS[device] : undefined;
-  return label ? chip("tag-device", label) : "";
+  return device === "tablet" ? chip("tag-device", "Tablet") : "";
 }
 
 /** Source chip: the referrer when there is one, otherwise the `from` tag.

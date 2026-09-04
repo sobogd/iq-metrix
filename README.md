@@ -171,9 +171,12 @@ clock regardless of the server's own timezone (`src/views/format.ts`).
 The visit list is one compact row per session, up to three short lines:
 the first shows location — flag + `Country · Region · City` — with the
 date/time and event count pinned to the right edge; the second is a row of
-colored text tags (no emoji): OS, device class (Mobile/Tablet/Desktop),
-the source (`via <referrer>` or `from <campaign>` when one exists),
-light/dark theme, language and duration; the third appears only for
+colored text tags (no emoji): OS (Windows/macOS/iOS/Android — the device
+form factor is implied), a `Tablet` chip only when the visit really came
+from a tablet (a tablet keeps the same OS name, so that one case is worth
+calling out), the source (`via <referrer>` or `from <campaign>` when one
+exists), light/dark theme, language and duration; the third appears only
+for
 identified sessions and carries the email tag — anonymous rows get no
 identity line at all. No app/landing label, no entry page and no UA client
 classification (search/AI/bot) are shown — that kind of labeling only
