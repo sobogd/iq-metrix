@@ -412,12 +412,6 @@ code {
   border: 1px solid rgba(91, 140, 255, 0.38);
 }
 
-.tag-app {
-  color: #8fd7ff;
-  background: rgba(91, 172, 255, 0.1);
-  border: 1px solid rgba(91, 172, 255, 0.36);
-}
-
 .tag-source {
   color: #93eccf;
   background: rgba(126, 224, 195, 0.1);
@@ -437,25 +431,6 @@ code {
 }
 
 .tag-muted {
-  color: var(--muted);
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-}
-
-/* Non-human traffic pills (search/AI/bot) — humans get no pill */
-.client-search {
-  color: #f6c85f;
-  background: rgba(246, 200, 95, 0.1);
-  border: 1px solid rgba(246, 200, 95, 0.4);
-}
-
-.client-ai {
-  color: #ff9ec2;
-  background: rgba(255, 120, 170, 0.1);
-  border: 1px solid rgba(255, 120, 170, 0.4);
-}
-
-.client-bot {
   color: var(--muted);
   background: var(--panel-2);
   border: 1px solid var(--border);

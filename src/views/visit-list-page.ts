@@ -44,11 +44,12 @@ function renderSummary(s: SiteSummary): string {
 // ---------------------------------------------------------------------------
 // Compact visit rows — three short lines per session:
 //   line 1: flag + country · region · city ......... date/time + event count
-//   line 2: colored TEXT tags (no emoji): OS, device class, app, from/via,
-//          theme, lang, duration, and the search/AI/bot kind badge
+//   line 2: colored TEXT tags (no emoji): OS, device class, source
+//          (via referrer / from), theme, lang, duration
 //   line 3: the email tag — only when the visit is identified; anonymous
 //          sessions get no line at all.
-// The whole row links to the visit detail page.
+// No app/landing label, no first page, no UA client classification — all of
+// that only confused the list. The whole row links to the visit detail.
 // ---------------------------------------------------------------------------
 
 const OS_LABELS: Record<string, string> = {
@@ -85,18 +86,13 @@ function deviceChip(device: string | null): string {
   return label ? chip("tag-device", label) : "";
 }
 
-/** Kind badge for non-human traffic (search/AI/bot); humans get none. */
-function kindChip(client: string | null): string {
-  if (client !== "search" && client !== "ai" && client !== "bot") return "";
-  const label = client === "search" ? "search" : client === "ai" ? "AI" : "bot";
-  return `<span class="tag client-${client}">${label}</span>`;
-}
-
-function sourceChips(from: string | null, ref: string | null): string {
-  const chips: string[] = [];
-  if (from) chips.push(chip("tag-source", `from ${from}`));
-  if (ref && ref !== from) chips.push(chip("tag-source", `via ${ref}`));
-  return chips.join("");
+/** Source chip: the referrer when there is one, otherwise the `from` tag.
+ *  UA client classification (search/AI/bot) is deliberately NOT shown — it
+ *  misfires on non-browser tools and only confuses the list. */
+function sourceChip(from: string | null, ref: string | null): string {
+  if (ref) return chip("tag-source", `via ${ref}`);
+  if (from) return chip("tag-source", `from ${from}`);
+  return "";
 }
 
 function themeChip(theme: string | null): string {
@@ -110,12 +106,10 @@ function renderRow(item: VisitListItem): string {
   const tags: string[] = [];
   tags.push(osChip(item.os));
   tags.push(deviceChip(item.device));
-  if (item.app) tags.push(chip("tag-app", item.app));
-  tags.push(sourceChips(item.from, item.ref));
+  tags.push(sourceChip(item.from, item.ref));
   tags.push(themeChip(item.theme));
   if (item.lang) tags.push(chip("tag-muted", item.lang));
   tags.push(chip("tag-muted", fmtDuration(item.firstAt, item.lastAt)));
-  tags.push(kindChip(item.client));
   const tagsHtml = tags.join("")
     ? `<div class="visit-tags">${tags.join("")}</div>`
     : "";

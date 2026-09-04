@@ -151,14 +151,15 @@ The core of the service, ported from the two references and made multi-tenant:
 
 Server-rendered HTML, mobile-first. A sticky topbar holds everything on one
 row even on a phone: a logo emoji (📊, no title text), a native `<select>`
-domain picker showing each site's domain and navigating via its one inline
-`onchange` (each site is its own page via `?site=`), and sign-out.
+site picker listing each site by its id (iq-rest / iq-translate /
+iq-mermaid) and navigating via its one inline `onchange` (each site is its
+own page via `?site=`), and sign-out.
 
 The dashboard is deliberately chart-free, filter-free and ranking-free.
 Above the list, a numeric summary strip shows **today's scorecard** — visits,
 events and distinct identified emails all counted over the current Madrid
 calendar day (00:00–23:59, Europe/Madrid — the same clock the salt rotation
-is anchored to), plus "live now" (visits active in the last 5 minutes). The
+is anchored to), plus "live" (visits active in the last 5 minutes). The
 cards sit in one row even on a phone, and the labels carry no "today" —
 the day is implicit. No date presets, no filters, no top-page/top-country
 rankings — the page answers "how is today going", and the list below it is
@@ -171,14 +172,16 @@ The visit list is one compact row per session, up to three short lines:
 the first shows location — flag + `Country · Region · City` — with the
 date/time and event count pinned to the right edge; the second is a row of
 colored text tags (no emoji): OS, device class (Mobile/Tablet/Desktop),
-app, from/via attribution, light/dark theme, language, duration, plus a
-`search`/`AI`/`bot` pill for non-human traffic; the third appears only for
+the source (`via <referrer>` or `from <campaign>` when one exists),
+light/dark theme, language and duration; the third appears only for
 identified sessions and carries the email tag — anonymous rows get no
-identity line at all. All traffic is shown — human, search-engine,
-AI-agent and other-bot visits each carry their own pill, with no client
-lens to hide any of it. Pagination is plain `<a href>` links,
-offset-based (30/page), with `hasNext` from fetching one row past the page
-size rather than a `COUNT(*)`. The whole row links to the visit detail.
+identity line at all. No app/landing label, no entry page and no UA client
+classification (search/AI/bot) are shown — that kind of labeling only
+misfires and confused the list. All traffic is still stored and listed —
+human, search-engine, AI-agent and other-bot visits alike — with no lens
+to hide any of it. Pagination is plain `<a href>` links, offset-based
+(30/page), with `hasNext` from fetching one row past the page size rather
+than a `COUNT(*)`. The whole row links to the visit detail.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 Meta chips are rendered generically from the current site's `Site.metaKeys`
