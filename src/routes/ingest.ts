@@ -7,7 +7,7 @@ import { sessionHash } from "../lib/session-hash";
 import { getSalt } from "../lib/salt";
 import { applyAttribution, applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
 import { signVisitToken, verifyVisitToken } from "../lib/visit-token";
-import { isScriptUa } from "../lib/client-kind";
+import { classifyRequest, isScriptUa } from "../lib/client-kind";
 import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX } from "../lib/labels";
 import {
   type Attribution,
@@ -181,11 +181,14 @@ export async function ingestRoutes(fastify: FastifyInstance): Promise<void> {
     }
     if (!visitRow) {
       // Raw ip and ua live only on this stack frame — hashed and derived,
-      // never stored.
+      // never stored. Client classification (token analysis + DNS check for
+      // engine-looking IPs) only runs when a row has to be created, not for
+      // token-continued batches of an existing visit.
       const network = clientNetwork(ip);
       const entropy = hashEntropy(facts);
       const hash = sessionHash(await getSalt(siteId), network, ua, entropy);
-      visitRow = await resolveVisit(siteId, hash, email, visitSeed(facts), now);
+      const client = await classifyRequest(facts);
+      visitRow = await resolveVisit(siteId, hash, email, visitSeed(facts, client), now);
     }
     // Pin the resolved row: `visitRow` is a `let`, so its narrowing does not
     // survive into the createMany callback below.

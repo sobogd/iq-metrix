@@ -60,8 +60,11 @@ Key design decisions (vs. the two reference pipelines this was ported from):
   feature is removed from both source products). Click-id fields a client still
   sends are simply ignored.
 - **Client classification** — the visit's UA is classified at ingest into
-  `human` / `search` / `ai` / `bot` (`Visit.client`; the raw UA is never
-  stored). Only server-side scripts (curl/axios/headless) are dropped.
+  `human` / `search` / `ai` / `preview` / `bot` (`Visit.client` + a
+  `clientReason` token explaining the verdict; the raw UA is never
+  stored). Search-engine labels are DNS-verified when possible, and a
+  nightly pass catches anonymous burst crawlers — see the dedicated bullet
+  further down. Only server-side scripts (curl/axios/headless) are dropped.
 
 ## Endpoints
 
@@ -142,10 +145,27 @@ The core of the service, ported from the two references and made multi-tenant:
   site's `metaKeys` are kept, capped at 8 keys / 32-char key / 128-char value; a
   bad key is dropped, not fatal. `from`/`ref`/`theme` are reserved across every
   site.
-- **Client classification** (`lib/client-kind.ts`) — the UA is classified into
-  `human` / `search` / `ai` / `bot` at ingest; only server-side scripts
-  (curl/axios/headless) are dropped, everything else is stored so crawler and
-  AI-agent traffic can be measured and filtered.
+- **Client classification** (`lib/client-kind.ts`) — the UA is classified at
+  ingest into `human` / `search` / `ai` / `preview` / `bot`; only server-side
+  scripts (curl/axios/headless) are dropped, everything else is stored so
+  crawler and AI-agent traffic can be measured. Classification is
+  deliberate:
+  - crawler tokens are matched **anchored** (as product tokens, never as a
+    bare substring — substring matching mislabels non-engine tools as
+    "search");
+  - the search-engine label is **proven**, not guessed, for Google/Bing/
+    Yandex/DuckDuckGo: engine-looking UAs from public IPs are verified with
+    reverse + forward DNS against the engine's published hostnames (cached
+    per IP, 24h), and a UA that claims an engine but fails DNS is stored as
+    a spoofed bot;
+  - a nightly pass (`lib/reclassify.ts`, 05:30 Europe/Madrid, plus once a
+    minute after boot) reclassifies anonymous "burst" crawler visits (6+
+    pageview events inside ≤3 s, no email) as bots — the one pattern UA
+    analysis can never see;
+  - `Visit.clientReason` records *why* a label was chosen
+    (`token:gptbot`, `dns:googlebot.com`, `isbot`, `no-browser-markers`,
+    `behaviour:burst`, …), so every verdict is answerable from data. The
+    raw UA is never stored.
 
 ## Admin UI
 

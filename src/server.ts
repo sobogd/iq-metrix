@@ -11,6 +11,7 @@ import { loginRoutes } from "./routes/login";
 import { homeRoutes } from "./routes/home";
 import { visitDetailRoutes } from "./routes/visit-detail";
 import { robotsRoutes } from "./routes/robots";
+import { startBotReclassifyScheduler } from "./lib/reclassify";
 
 // Read once at boot, served from memory — the only static asset this
 // service has right now is the one stylesheet (no build step, no bundler,
@@ -64,6 +65,7 @@ async function main(): Promise<void> {
   await fastify.register(publicIngestRoutes);
 
   await fastify.listen({ port: env.port, host: "0.0.0.0" });
+  startBotReclassifyScheduler();
 }
 
 main().catch((err: unknown) => {

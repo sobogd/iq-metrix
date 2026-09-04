@@ -1,5 +1,5 @@
 import { UAParser } from "ua-parser-js";
-import { classifyClient, type VisitClient } from "./client-kind";
+import { classifyClient, type ClientClassification, type VisitClient } from "./client-kind";
 
 // Everything we derive from the raw request facts the relay forwards.
 //
@@ -142,6 +142,8 @@ export interface VisitSeed {
   lang: string | null;
   /** UA classification (never the raw UA) — see client-kind.ts. */
   client: VisitClient;
+  /** Short token explaining `client` — see client-kind.ts. */
+  clientReason: string | null;
 }
 
 /**
@@ -150,9 +152,14 @@ export interface VisitSeed {
  * relay forwards whatever it has under those same names, so this pipeline
  * stays one codebase across all three products. Absent in local dev (no
  * relay/proxy in front there): country falls back to "XX".
+ *
+ * `clientInfo` is the optional result of classifyRequest (token analysis +
+ * DNS verification of engine IPs). When omitted — callers that only have a
+ * UA, e.g. tests — classification falls back to the pure-UA token pass.
  */
-export function visitSeed(facts: RawFacts): VisitSeed {
+export function visitSeed(facts: RawFacts, clientInfo?: ClientClassification): VisitSeed {
   const { device, os } = classifyDevice(facts.ua);
+  const client = clientInfo ?? classifyClient(facts.ua);
   return {
     device,
     os,
@@ -160,7 +167,8 @@ export function visitSeed(facts: RawFacts): VisitSeed {
     region: decodeHeader(facts, "cf-region"),
     city: decodeHeader(facts, "cf-ipcity"),
     lang: acceptLanguage(facts),
-    client: classifyClient(facts.ua),
+    client: client.client,
+    clientReason: client.reason,
   };
 }
 

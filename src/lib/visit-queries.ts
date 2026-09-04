@@ -1,22 +1,20 @@
 import { type Event, type Site, type Visit } from "@prisma/client";
 import { prisma } from "../db";
+import { madridDayBounds } from "./madrid";
 
 // Read-only query layer for the admin pages (routes/home.ts,
 // routes/visit-detail.ts).
 //
 // The dashboard is deliberately filter-free and chart-free. The summary
 // strip counts the CURRENT MADRID CALENDAR DAY (00:00–23:59, Europe/Madrid)
-// — every card says "· today" — and "live now" is visits with activity in
-// the last few minutes. The visit list below shows every visit for the
-// site, newest-active first, with no app/client/date/email/meta filtering
-// and no top rankings. The one remaining knob is the site switcher in the
-// topbar.
+// — visits, events, identified emails — plus "Live" (activity in the last
+// few minutes). The visit list below shows every visit for the site,
+// newest-active first, with no app/client/date/email/meta filtering and no
+// top rankings. The one remaining knob is the site switcher in the topbar.
 
 const PAGE_SIZE = 30;
 // "Live" = visits that saw an event in the last 5 minutes.
 const LIVE_WINDOW_MS = 5 * 60_000;
-
-const MADRID_TZ = "Europe/Madrid";
 
 export interface VisitListItem {
   id: string;
@@ -111,60 +109,6 @@ interface SummaryRow {
   eventsToday: number;
   emailsToday: number;
   liveNow: number;
-}
-
-interface Ymd {
-  y: number;
-  m: number;
-  d: number;
-}
-
-/** Calendar date (y/m/d) that `date` shows on a Europe/Madrid clock. */
-function madridYmd(date: Date): Ymd {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: MADRID_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const get = (t: Intl.DateTimeFormatPartTypes): number =>
-    Number(parts.find((p) => p.type === t)?.value);
-  return { y: get("year"), m: get("month"), d: get("day") };
-}
-
-/** Europe/Madrid's UTC offset (wall clock − UTC) at `date`, in ms. Read via
- *  ICU's formatToParts: format `date` in Madrid and re-read that wall clock
- *  as if it were UTC — the difference is the offset. Handles DST exactly,
- *  including the two offset hours of Europe/Madrid (CET/CEST). */
-function madridOffsetMs(date: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: MADRID_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const get = (t: Intl.DateTimeFormatPartTypes): number =>
-    Number(parts.find((p) => p.type === t)?.value);
-  const wallAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
-  return wallAsUtc - date.getTime();
-}
-
-/** [00:00, 24:00) of the current Madrid calendar day, as UTC instants.
- *
- *  Madrid midnight is `offset` hours behind the UTC midnight of the same
- *  wall date, and Europe/Madrid's DST transitions happen at ≥ 01:00 UTC, so
- *  the offset probed at 00:00 UTC is always the offset in force at the day's
- *  start — probing at utcMidnight − offset would be off by one hour on
- *  transition days, this is exact. */
-function madridDayBounds(now: Date): { start: Date; end: Date } {
-  const { y, m, d } = madridYmd(now);
-  const utcMidnight = Date.UTC(y, m - 1, d);
-  const start = new Date(utcMidnight - madridOffsetMs(new Date(utcMidnight)));
-  return { start, end: new Date(start.getTime() + 86_400_000) };
 }
 
 export async function getSiteSummary(siteId: string, now: Date): Promise<SiteSummary> {

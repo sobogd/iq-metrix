@@ -73,9 +73,16 @@ model Visit {
   // "web" — which part of the product the visit happened in.
   app   String?
   // Classification of the visit's user-agent, set at ingest: 'human' |
-  // 'search' | 'ai' | 'bot'. Null for legacy rows (imported history predates
-  // this column). The raw UA is never stored — see src/lib/client-kind.ts.
+  // 'search' | 'ai' | 'preview' | 'bot'. Null for legacy rows (imported
+  // history predates this column). The raw UA is never stored — see
+  // src/lib/client-kind.ts.
   client String?
+  // Why `client` got that value — a short token like "token:googlebot",
+  // "dns:googlebot.com" (verified via reverse/forward DNS), "isbot",
+  // "no-browser-markers" or "behaviour:burst" (nightly recompute). Written
+  // only when the visit row is created, except for the nightly recompute.
+  // Kept so a "why is this a bot?" is answerable from data, not guesses.
+  clientReason String?
   // Denormalized latest values of custom per-site fields (restaurantId,
   // topicId, plan, ...), updated on every ingest call from the latest
   // event(s) so the visit list can filter/show it without joining events.

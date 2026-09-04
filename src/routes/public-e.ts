@@ -6,7 +6,7 @@ import { sessionHash } from "../lib/session-hash";
 import { getSalt } from "../lib/salt";
 import { applyAttribution, applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
 import { signVisitToken, verifyVisitToken } from "../lib/visit-token";
-import { isScriptUa } from "../lib/client-kind";
+import { classifyRequest, isScriptUa } from "../lib/client-kind";
 import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX } from "../lib/labels";
 import {
   type Attribution,
@@ -185,7 +185,8 @@ export async function publicIngestRoutes(fastify: FastifyInstance): Promise<void
       const network = clientNetwork(facts.ip);
       const entropy = hashEntropy(facts);
       const hash = sessionHash(await getSalt(siteId), network, ua, entropy);
-      visitRow = await resolveVisit(siteId, hash, email, visitSeed(facts), now);
+      const client = await classifyRequest(facts);
+      visitRow = await resolveVisit(siteId, hash, email, visitSeed(facts, client), now);
     }
     const visit: Visit = visitRow;
 
