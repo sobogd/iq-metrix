@@ -1,6 +1,19 @@
 import type { Event, Site, Visit } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
-import { asMetaKeysRegistry, coerceMeta, countryEmoji, deviceEmoji, fmtDateTime, fmtDuration, renderMetaChips } from "./format";
+import {
+  asMetaKeysRegistry,
+  coerceMeta,
+  countryEmoji,
+  countryName,
+  fmtClock,
+  fmtDayLabel,
+  fmtDateTime,
+  fmtDuration,
+  fmtMadridDay,
+  fmtVisitRange,
+  renderMetaChips,
+} from "./format";
+import { chip, clientChip, deviceChip, osChip, sourceChip, themeChip } from "./tags";
 
 // Separate page (GET /visits/:id), not a <dialog> opened from the list row.
 // Picked over a dialog because this app deliberately has no client JS
@@ -25,67 +38,157 @@ function kv(label: string, value: string): string {
   return `<div class="kv"><span class="k">${escapeHtml(label)}</span><span class="v">${value}</span></div>`;
 }
 
+/** <code> that truncates with an ellipsis but keeps the full value in a
+ *  tooltip — long hex ids would otherwise blow the row width. */
+function kvCode(label: string, value: string, keep = 24): string {
+  const shown = value.length > keep ? `${value.slice(0, keep)}…` : value;
+  return kv(label, `<code title="${escapeHtml(value)}">${escapeHtml(shown)}</code>`);
+}
+
+// ---------------------------------------------------------------------------
+// Session head — deliberately the SAME grammar as a sessions-list row
+// (visit-list-page.ts): location + activity-window on the first line, then a
+// wrap-around row of colored attribute chips, then the identity (email) chip.
+// The verbose id/key/hash rows that used to live in a tall label grid are
+// folded into a collapsed native <details> below the head — no JS needed.
+// ---------------------------------------------------------------------------
+
+/** Chips for the head's tag row. Order matches the list rows: app (when the
+ *  site uses sub-apps), OS, tablet, via/from source, theme, lang, then the
+ *  activity duration; a red non-human pill is appended for crawler traffic
+ *  (detail page only — the list deliberately stays clean of it). */
+function renderHeadTags(visit: Visit): string {
+  const tags: string[] = [];
+  if (visit.app) tags.push(chip("tag-muted", visit.app));
+  tags.push(osChip(visit.os));
+  tags.push(deviceChip(visit.device));
+  tags.push(sourceChip(visit.from, visit.ref));
+  tags.push(themeChip(visit.theme));
+  if (visit.lang) tags.push(chip("tag-muted", visit.lang));
+  tags.push(chip("tag-muted", fmtDuration(visit.firstAt, visit.lastAt)));
+  tags.push(clientChip(visit.client, visit.clientReason));
+  return `<div class="visit-tags">${tags.join("")}</div>`;
+}
+
+/** One-line compact head card. Everything at-a-glance about the session;
+ *  ids and hashes live in the collapsed <details> below instead. */
+function renderSessionHead(visit: Visit, eventsCount: number, metaBlock: string): string {
+  const geo = [countryName(visit.country), visit.region, visit.city].filter(Boolean).join(" · ");
+  const rangeTitle = `${fmtDayLabel(visit.firstAt)}, ${fmtClock(visit.firstAt)} → ${fmtDayLabel(visit.lastAt)}, ${fmtClock(visit.lastAt)} · Europe/Madrid`;
+  const idHtml = visit.email
+    ? `<div class="visit-id">${chip("tag-email", visit.email)}</div>`
+    : "";
+
+  return `
+  <section class="session-head">
+    <div class="visit-geo"><span class="visit-flag">${countryEmoji(visit.country)}</span><span class="visit-location">${escapeHtml(geo)}</span></div>
+    <div class="visit-meta"><time title="${escapeHtml(rangeTitle)}">${escapeHtml(fmtVisitRange(visit.firstAt, visit.lastAt))}</time><span class="visit-events">${eventsCount} evt</span></div>
+    ${renderHeadTags(visit)}
+    ${idHtml}
+    ${metaBlock}
+  </section>`;
+}
+
+/** Collapsed "everything else" — verbose rows that would only add noise to
+ *  the compact head: exact timestamps, attribution raw values, the bot
+ *  verdict, and the internal visit/key/hash identifiers. */
+function renderRawDetails(visit: Visit): string {
+  const fields = [
+    kv("First seen", fmtDateTime(visit.firstAt)),
+    kv("Last seen", fmtDateTime(visit.lastAt)),
+    kv("From", escapeHtml(visit.from ?? "—")),
+    kv("Referrer", escapeHtml(visit.ref ?? "—")),
+    kv("Client kind", escapeHtml(visit.client ?? "—")),
+    visit.clientReason ? kv("Client reason", escapeHtml(visit.clientReason)) : "",
+    kv("Merged anonymous visits", String(visit.mergeCount)),
+    kv("Visit id", `<code>${escapeHtml(visit.id)}</code>`),
+    kvCode("Visit key", visit.visitKey),
+    kvCode("Device hash", visit.hash),
+  ].join("");
+  return `<details class="raw"><summary>Session ids &amp; exact timestamps</summary><div class="kv-grid">${fields}</div></details>`;
+}
+
+// ---------------------------------------------------------------------------
+// Event stream — one compact row per event, ordered by time. The visible
+// time (HH:MM:SS) is the ordering anchor; page / action / name flow inline
+// as chips + text, and locale/app/meta ride at the end of the same line so a
+// session reads as a single scannable sequence instead of stacked cards.
+// ---------------------------------------------------------------------------
+
+// Action verbs worth calling out in color while scanning the funnel.
+const INTERACT_ACTIONS = new Set([
+  "Click", "Tap", "Focus", "Type", "Select", "Choose", "Submit", "Toggle",
+  "Change", "Drag", "Hover", "Edit", "Search", "Copy", "Switch", "Open",
+  "Close", "Enter", "Send", "Currency",
+]);
+const CONVERT_ACTIONS = new Set([
+  "Register", "Sign up", "Signup", "Login", "Sign in", "Subscribe",
+  "Purchase", "Pay", "Checkout", "Upgrade", "Convert",
+]);
+
+function actionChip(action: string): string {
+  const cls = CONVERT_ACTIONS.has(action)
+    ? "tag-convert"
+    : INTERACT_ACTIONS.has(action)
+      ? "tag-interact"
+      : "tag-muted";
+  return chip(cls, action);
+}
+
+function renderEvent(e: Event, registry: ReturnType<typeof asMetaKeysRegistry>): string {
+  const meta = coerceMeta(e.meta);
+  const extra: string[] = [];
+  if (e.locale) extra.push(chip("tag-muted", e.locale));
+  if (e.app) extra.push(chip("tag-muted", e.app));
+  if (Object.keys(meta).length > 0) extra.push(renderMetaChips(meta, registry));
+
+  const full = `${fmtDayLabel(e.at)}, ${fmtClock(e.at)} · Europe/Madrid`;
+  return `
+  <div class="evt">
+    <time class="evt-time" datetime="${escapeHtml(e.at.toISOString())}" title="${escapeHtml(full)}">${fmtClock(e.at)}</time>
+    <div class="evt-body">
+      <span class="tag tag-page">${escapeHtml(e.page)}</span>
+      ${actionChip(e.action)}
+      <span class="evt-name">${escapeHtml(e.name)}</span>
+      ${extra.join("")}
+    </div>
+  </div>`;
+}
+
 function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysRegistry>): string {
   if (events.length === 0) return `<p class="muted">No events recorded.</p>`;
-  const head = ["🕐 At", "📄 Page", "⚡ Action", "🏷️ Name", "🌐 Locale", "🧩 App", "Meta"]
-    .map((h, i) => {
-      const title = i === 0 ? ` title="Europe/Madrid time"` : "";
-      return `<span class="viz-cell"${title}>${h}</span>`;
-    })
-    .join("");
-  const rows = events
-    .map(
-      (e) => `
-    <div class="viz-row">
-      <span class="viz-cell" data-label="At">${fmtDateTime(e.at)}</span>
-      <span class="viz-cell" data-label="Page">${escapeHtml(e.page)}</span>
-      <span class="viz-cell" data-label="Action">${escapeHtml(e.action)}</span>
-      <span class="viz-cell" data-label="Name">${escapeHtml(e.name)}</span>
-      <span class="viz-cell" data-label="Locale">${e.locale ? escapeHtml(e.locale) : "—"}</span>
-      <span class="viz-cell" data-label="App">${e.app ? escapeHtml(e.app) : "—"}</span>
-      <span class="viz-cell" data-label="Meta">${renderMetaChips(coerceMeta(e.meta), registry)}</span>
-    </div>`,
-    )
-    .join("");
-  return `<div class="viz"><div class="viz-row viz-head">${head}</div>${rows}</div>`;
+  const rows: string[] = [];
+  // Day dividers appear only when the stream crosses into a new Madrid
+  // calendar day — a single-day session needs no label (the head already
+  // shows the window).
+  let prevDay: string | null = null;
+  for (const e of events) {
+    const day = fmtMadridDay(e.at);
+    if (prevDay !== null && day !== prevDay) {
+      rows.push(`<div class="evt-day">${escapeHtml(fmtDayLabel(e.at))}</div>`);
+    }
+    prevDay = day;
+    rows.push(renderEvent(e, registry));
+  }
+  return `<div class="evt-list">${rows.join("")}</div>`;
 }
 
 export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site | null, sites: Site[]): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
   const meta = coerceMeta(visit.meta);
-  const location = `${countryEmoji(visit.country)} ${escapeHtml(visit.country)}${visit.region ? ` · ${escapeHtml(visit.region)}` : ""}${visit.city ? ` · ${escapeHtml(visit.city)}` : ""}`;
 
-  const fields = [
-    kv("Site", escapeHtml(visit.siteId)),
-    kv("App", visit.app ? escapeHtml(visit.app) : "—"),
-    kv("First seen", fmtDateTime(visit.firstAt)),
-    kv("Last seen", fmtDateTime(visit.lastAt)),
-    kv("Duration", fmtDuration(visit.firstAt, visit.lastAt)),
-    kv("Device", `${deviceEmoji(visit.device)} ${escapeHtml(visit.device ?? "—")}`),
-    kv("OS", escapeHtml(visit.os ?? "—")),
-    kv("Location", location),
-    kv("Language", escapeHtml(visit.lang ?? "—")),
-    kv("Theme", escapeHtml(visit.theme ?? "—")),
-    kv("Identity", visit.email ? `✉️ ${escapeHtml(visit.email)}` : "👻 anon"),
-    kv("From", escapeHtml(visit.from ?? "—")),
-    kv("Referrer", escapeHtml(visit.ref ?? "—")),
-    kv("Merged anonymous visits", String(visit.mergeCount)),
-    kv("Visit id", `<code>${escapeHtml(visit.id)}</code>`),
-    kv("Visit key", `<code title="${escapeHtml(visit.visitKey)}">${escapeHtml(visit.visitKey.slice(0, 16))}…</code>`),
-    kv("Device hash", `<code title="${escapeHtml(visit.hash)}">${escapeHtml(visit.hash.slice(0, 16))}…</code>`),
-  ].join("");
+  // Meta snapshot stays visible on the head (latest values — an owner can
+  // switch mid-visit, which is why events also carry their own).
+  const metaBlock =
+    Object.keys(meta).length > 0
+      ? `<div class="meta-block"><span class="k">Meta snapshot</span><div>${renderMetaChips(meta, registry)}</div></div>`
+      : "";
 
   const body = `${renderTopbar(sites, visit.siteId)}
 <main class="dashboard">
-  <p><a href="/?site=${escapeHtml(visit.siteId)}">← Back to visits</a></p>
-  <section class="card detail">
-    <h2>Visit detail</h2>
-    <div class="kv-grid">${fields}</div>
-    <div class="meta-block">
-      <span class="k">🏷️ Meta snapshot</span>
-      <div>${renderMetaChips(meta, registry)}</div>
-    </div>
-  </section>
+  <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}">← Back to visits</a></p>
+  ${renderSessionHead(visit, events.length, metaBlock)}
+  ${renderRawDetails(visit)}
   <section>
     <h2>Events (${events.length})</h2>
     ${renderEvents(events, registry)}

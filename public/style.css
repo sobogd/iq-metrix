@@ -1,9 +1,10 @@
 /* iq-metrix — one plain stylesheet, no build step, no framework.
  *
- * Responsive convention: a component marked `.viz` renders as a table
- * >=720px wide and as stacked cards below it, from the SAME markup — see
- * the `.viz` rules further down. Used by the visit list (visit-list-page.ts)
- * and visit detail's events table (visit-detail-page.ts).
+ * The two admin surfaces share one visual grammar: compact rows built from
+ * colored text pills ("chips"). The sessions list (visit-list-page.ts) shows
+ * one row per session; the session detail (visit-detail-page.ts) reuses the
+ * exact same row look for its head and renders its event stream as
+ * one-chip-line-per-event rows below it.
  */
 
 :root {
@@ -189,79 +190,6 @@ button.link:hover {
   font-size: 14px;
 }
 
-/* ---------- Table >=720px / stacked cards <720px ---------- *
- *
- * Markup shape: .viz > .viz-row (one per record), each with
- * .viz-cell[data-label] children, plus one optional .viz-row.viz-head for
- * column headers (hidden in card mode — see its @media rule above).
- *
- * Wide: .viz-row behaves like a table row, .viz-cell like a table cell.
- * Narrow: .viz-row becomes a block "card", .viz-cell stacks and grows a
- * `data-label` prefix via ::before so the same markup reads as label/value
- * pairs without a second template.
- */
-
-.viz {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.viz .viz-row {
-  display: table-row;
-}
-
-.viz .viz-cell {
-  display: table-cell;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.viz .viz-head {
-  font-weight: 600;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-.viz .viz-head .viz-cell {
-  border-bottom: 1px solid var(--border);
-}
-
-@media (max-width: 720px) {
-  .viz,
-  .viz .viz-row,
-  .viz .viz-cell {
-    display: block;
-  }
-
-  /* Card mode replaces column headers with a per-cell data-label prefix
-   * (below) — the header row itself would just be a redundant, oddly
-   * formatted extra "card". */
-  .viz-head {
-    display: none !important;
-  }
-
-  .viz .viz-row {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 8px 12px;
-    margin-bottom: 10px;
-  }
-
-  .viz .viz-cell {
-    border-bottom: none;
-    padding: 4px 0;
-  }
-
-  .viz .viz-cell[data-label]::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 12px;
-    color: var(--muted);
-  }
-}
-
 /* ---------- Dashboard shell (visit list + visit detail) ---------- */
 
 .dashboard {
@@ -298,9 +226,8 @@ code {
  * One compact row per session, up to three short lines:
  *   line 1 — location: flag + country · region · city, with the
  *            date/time and event count pinned to the right;
- *   line 2 — colored TEXT tags (no emoji): OS, device class, app,
- *            from/via source, theme, lang, duration, and a search/AI/bot
- *            kind pill for non-human traffic;
+ *   line 2 — colored TEXT tags (no emoji): OS, "Tablet" only when it
+ *            really is one, via/from source, theme, lang, duration;
  *   line 3 — the email tag, only when the visit is identified — anonymous
  *            sessions get no identity line at all.
  * The whole row is one link to the visit detail page. Single full-width
@@ -436,6 +363,34 @@ code {
   border: 1px solid var(--border);
 }
 
+/* Event-stream pills (visit detail). The page an event happened on, plus the
+ * action verb split into "interaction" vs "conversion" so a funnel scans:
+ * clicks/inputs read blue, registration/subscription-like moments gold. */
+.tag-page {
+  color: #c9adff;
+  background: rgba(183, 140, 255, 0.1);
+  border: 1px solid rgba(183, 140, 255, 0.36);
+}
+
+.tag-interact {
+  color: #9cc2ff;
+  background: rgba(91, 140, 255, 0.12);
+  border: 1px solid rgba(91, 140, 255, 0.38);
+}
+
+.tag-convert {
+  color: #ffd98a;
+  background: rgba(246, 200, 95, 0.12);
+  border: 1px solid rgba(246, 200, 95, 0.4);
+}
+
+/* Non-human traffic (search/AI/preview/bot) — detail page head only. */
+.tag-bot {
+  color: #ffa3a3;
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+}
+
 /* ---------- Meta chips ---------- */
 
 .chip {
@@ -475,11 +430,149 @@ a.chip:hover {
   color: var(--accent);
 }
 
-/* ---------- Visit detail ---------- */
+/* ---------- Visit detail ---------- *
+ *
+ * Compact session head — the same grid + chip grammar as the sessions-list
+ * rows ("Visit list rows" above), so a detail page reads as an expanded
+ * list row: location + activity window up top, attribute chips under it,
+ * then the identity chip. The verbose id/key/hash rows live in a collapsed
+ * native <details> beneath the head, and the events render below as one
+ * chip line per event — time-first, per-day-grouped.
+ */
 
-.card.detail {
-  max-width: none;
-  width: 100%;
+.crumb {
+  margin: 0;
+  font-size: 13px;
+}
+
+.session-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 12px;
+  row-gap: 7px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+}
+
+.session-head > .visit-tags,
+.session-head > .visit-id,
+.session-head > .meta-block {
+  grid-column: 1 / -1;
+}
+
+/* The meta snapshot gets a lighter divider than the standalone version:
+ * it sits inside the same head card, right under the chips. */
+.session-head .meta-block {
+  margin-top: 2px;
+  padding-top: 10px;
+}
+
+/* Collapsed "everything else" — exact timestamps, attribution raw values,
+ * bot verdict, internal ids/hashes. Native <details>: no client JS needed. */
+details.raw {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 14px;
+}
+
+details.raw summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  user-select: none;
+}
+
+details.raw summary:hover {
+  color: var(--text);
+}
+
+details.raw[open] summary {
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+/* ---------- Visit detail: event stream ---------- *
+ *
+ * One row per event, in time order. The clock (HH:MM:SS, Europe/Madrid) is
+ * the ordering anchor on the left; page / action / name plus any
+ * locale/app/meta chips flow as one wrap-around line next to it, so "which
+ * event came after which" reads at a glance instead of stacked cards. A new
+ * Madrid calendar day inserts a divider label above that day's first event.
+ */
+
+.evt-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.evt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  padding: 6px 0;
+}
+
+.evt + .evt {
+  border-top: 1px solid var(--border);
+}
+
+.evt-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.evt-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 7px;
+  min-width: 0;
+}
+
+/* renderMetaChips' .chip rules add their own right/bottom margins — the
+ * flex row above supplies the spacing, so zero them inside the stream. */
+.evt-body .chip {
+  margin: 0;
+}
+
+.evt-name {
+  font-size: 13px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.evt-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.evt-day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+@media (max-width: 720px) {
+  .evt {
+    padding: 5px 0;
+    column-gap: 10px;
+  }
 }
 
 .kv-grid {

@@ -1,6 +1,7 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { countryEmoji, countryName, fmtDuration, fmtShortDateTime } from "./format";
+import { chip, deviceChip, osChip, sourceChip, themeChip } from "./tags";
 import type { SiteSummary, VisitListItem } from "../lib/visit-queries";
 
 export interface VisitListPageData {
@@ -51,51 +52,6 @@ function renderSummary(s: SiteSummary): string {
 // No app/landing label, no first page, no UA client classification — all of
 // that only confused the list. The whole row links to the visit detail.
 // ---------------------------------------------------------------------------
-
-const OS_LABELS: Record<string, string> = {
-  windows: "Windows",
-  macos: "macOS",
-  linux: "Linux",
-  ios: "iOS",
-  android: "Android",
-};
-
-const THEME_LABELS: Record<string, { text: string; cls: string }> = {
-  dark: { text: "dark", cls: "tag-theme-dark" },
-  light: { text: "light", cls: "tag-theme-light" },
-};
-
-/** One colored text pill. All dynamic text is escaped here. */
-function chip(cls: string, text: string): string {
-  return `<span class="tag ${cls}">${escapeHtml(text)}</span>`;
-}
-
-function osChip(os: string | null): string {
-  const label = os ? OS_LABELS[os] : undefined;
-  return label ? chip("tag-os", label) : "";
-}
-
-/** Device-class chip — only "Tablet". Desktop/mobile are already implied
- *  by the OS chip (Windows/macOS/Linux are always desktop; iOS/Android are
- *  phone-sized by default), but a tablet keeps the same OS name, so the one
- *  case worth calling out is when the visit really came from a tablet. */
-function deviceChip(device: string | null): string {
-  return device === "tablet" ? chip("tag-device", "Tablet") : "";
-}
-
-/** Source chip: the referrer when there is one, otherwise the `from` tag.
- *  UA client classification (search/AI/bot) is deliberately NOT shown — it
- *  misfires on non-browser tools and only confuses the list. */
-function sourceChip(from: string | null, ref: string | null): string {
-  if (ref) return chip("tag-source", `via ${ref}`);
-  if (from) return chip("tag-source", `from ${from}`);
-  return "";
-}
-
-function themeChip(theme: string | null): string {
-  const t = theme ? THEME_LABELS[theme] : undefined;
-  return t ? chip(t.cls, t.text) : "";
-}
 
 function renderRow(item: VisitListItem): string {
   const geo = [countryName(item.country), item.region, item.city].filter(Boolean).join(" · ");

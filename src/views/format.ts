@@ -36,6 +36,42 @@ export function fmtShortDateTime(d: Date): string {
   return `${get("day")}.${get("month")} ${get("hour")}:${get("minute")}`;
 }
 
+/** "20:34:51" — clock with seconds, Europe/Madrid. Event rows in the session
+ *  detail lean on it so the order of events (often seconds apart) is
+ *  readable without a whole date per row. */
+export function fmtClock(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: MADRID_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(d);
+}
+
+/** Calendar-day key of a timestamp on the Madrid clock ("27.08.2025") — used
+ *  to break a long event stream into per-day groups. */
+export function fmtMadridDay(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: MADRID_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(d);
+  const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("day")}.${get("month")}.${get("year")}`;
+}
+
+/** "27 Aug 2025" — label for the per-day group dividers above event rows. */
+export function fmtDayLabel(d: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: MADRID_TZ,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(d);
+}
+
 /** Human duration between two timestamps: "42s", "3m", "1h 12m", "2d 4h". */
 export function fmtDuration(from: Date, to: Date): string {
   const ms = Math.max(0, to.getTime() - from.getTime());
@@ -47,6 +83,15 @@ export function fmtDuration(from: Date, to: Date): string {
   if (h < 24) return `${h}h ${m % 60}m`;
   const d = Math.floor(h / 24);
   return `${d}d ${h % 24}h`;
+}
+
+/** "27.08 20:17→20:35" — first→last activity on one line for the compact
+ *  session head; when the span crosses midnight the day repeats:
+ *  "26.08 23:50 → 27.08 00:05". */
+export function fmtVisitRange(from: Date, to: Date): string {
+  const a = fmtShortDateTime(from);
+  const b = fmtShortDateTime(to);
+  return a.slice(0, 5) === b.slice(0, 5) ? `${a}→${b.slice(6)}` : `${a} → ${b}`;
 }
 
 /** Flag emoji from a 2-letter ISO country code via the Unicode regional
