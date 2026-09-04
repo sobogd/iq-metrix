@@ -13,7 +13,7 @@ import { prisma } from "../db";
 // topbar.
 
 const PAGE_SIZE = 30;
-// "Live now" = visits that saw an event in the last 5 minutes.
+// "Live" = visits that saw an event in the last 5 minutes.
 const LIVE_WINDOW_MS = 5 * 60_000;
 
 const MADRID_TZ = "Europe/Madrid";

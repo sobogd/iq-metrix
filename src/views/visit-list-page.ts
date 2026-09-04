@@ -29,7 +29,7 @@ function renderSummary(s: SiteSummary): string {
     { label: "Visits", value: String(s.visitsToday) },
     { label: "Events", value: String(s.eventsToday) },
     { label: "Identified", value: String(s.emailsToday) },
-    { label: "Live now", value: String(s.liveNow), live: true },
+    { label: "Live", value: String(s.liveNow), live: true },
   ];
   return `<section class="summary">${cards
     .map(
