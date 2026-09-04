@@ -46,7 +46,12 @@ a {
   color: var(--accent);
 }
 
-/* ---------- Top bar (signed-in pages) ---------- */
+/* ---------- Top bar (signed-in pages) ---------- *
+ *
+ * One row even on a phone: logo (emoji only) on the left, the domain
+ * <select> growing to fill the middle (navigates on change — the app's only
+ * inline JS), sign-out pinned to the right. No title text, no wrapping.
+ */
 
 .topbar {
   position: sticky;
@@ -59,52 +64,38 @@ a {
 .topbar-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 10px 16px;
   max-width: var(--max-width);
   margin: 0 auto;
 }
 
-.site-nav {
-  display: flex;
-  gap: 6px;
-  margin-right: auto;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.site-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.site-link {
-  color: var(--muted);
+.logo {
+  flex: 0 0 auto;
+  font-size: 22px;
+  line-height: 1;
   text-decoration: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  white-space: nowrap;
 }
 
-.site-link:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-.site-link.active {
+.site-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
   color: var(--text);
   background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.site-select:focus {
+  outline: none;
   border-color: var(--accent);
 }
 
-.placeholder {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 24px;
+.topbar-inner form {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 /* ---------- Buttons / links-as-buttons ---------- */
@@ -557,13 +548,26 @@ a.chip:hover {
 
 .summary {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
 }
 
-@media (min-width: 720px) {
+/* Keep the four cards side by side on phones too — tighter cards below. */
+@media (max-width: 480px) {
   .summary {
-    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .stat {
+    padding: 10px 8px;
+  }
+
+  .stat-value {
+    font-size: 21px;
+  }
+
+  .stat-label {
+    font-size: 10.5px;
   }
 }
 
@@ -596,12 +600,6 @@ a.chip:hover {
 /* ---------- Mobile touch targets ---------- */
 
 @media (max-width: 720px) {
-  .site-link {
-    min-height: 40px;
-    display: inline-flex;
-    align-items: center;
-  }
-
   .dashboard {
     padding: 16px;
     gap: 16px;

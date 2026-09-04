@@ -1,3 +1,5 @@
+import type { Site } from "@prisma/client";
+
 export function escapeHtml(input: string): string {
   return input
     .replace(/&/g, "&amp;")
@@ -5,6 +7,31 @@ export function escapeHtml(input: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/** Shared page header: logo emoji only (no title text), then the domain
+ *  selector, then sign-out — all on one row, even on a phone. The selector
+ *  is a native <select> whose options are self-navigating URLs; the inline
+ *  onchange is the app's only client JS. */
+export function renderTopbar(sites: Site[], currentSiteId?: string): string {
+  const options = sites
+    .map(
+      (s) =>
+        `<option value="/?site=${escapeHtml(s.id)}"${s.id === currentSiteId ? " selected" : ""}>${escapeHtml(s.domain)}</option>`,
+    )
+    .join("");
+  const select =
+    sites.length > 0
+      ? `<select class="site-select" aria-label="Domain" onchange="location.href=this.value">${options}</select>`
+      : "";
+  return `
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="/" aria-label="iq-metrix">📊</a>
+    ${select}
+    <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+  </div>
+</header>`;
 }
 
 /** Shared page chrome. Server-rendered template strings only — no React, no

@@ -13,7 +13,8 @@ domains resolve, and the consumers below are already wired to it. Admin UI:
 ## Stack
 
 Node 22, TypeScript, Fastify, Prisma, PostgreSQL. Server-rendered HTML via plain
-template functions — no React/Next/build step/UI framework, no client JS at all.
+template functions — no React/Next/build step/UI framework, and no client JS
+except one inline `onchange` on the header's domain dropdown.
 One CSS file (`public/style.css`). pm2 in production (fork mode, **single
 instance** — the salt cache/rotation lock and the rate limiter are in-process
 state).
@@ -148,17 +149,20 @@ The core of the service, ported from the two references and made multi-tenant:
 
 ## Admin UI
 
-Server-rendered HTML, zero client JS, mobile-first. A sticky topbar shows one
-horizontally-scrollable nav link per site (each site is its own page via
-`?site=`), plus sign-out.
+Server-rendered HTML, mobile-first. A sticky topbar holds everything on one
+row even on a phone: a logo emoji (📊, no title text), a native `<select>`
+domain picker showing each site's domain and navigating via its one inline
+`onchange` (each site is its own page via `?site=`), and sign-out.
 
 The dashboard is deliberately chart-free, filter-free and ranking-free.
-Above the list, a numeric summary strip shows **today's scorecard**: visits,
+Above the list, a numeric summary strip shows **today's scorecard** — visits,
 events and distinct identified emails all counted over the current Madrid
 calendar day (00:00–23:59, Europe/Madrid — the same clock the salt rotation
-is anchored to), plus "live now" (visits active in the last 5 minutes). No
-date presets, no filters, no top-page/top-country rankings — the page
-answers "how is today going", and the list below it is the raw drill-down.
+is anchored to), plus "live now" (visits active in the last 5 minutes). The
+cards sit in one row even on a phone, and the labels carry no "today" —
+the day is implicit. No date presets, no filters, no top-page/top-country
+rankings — the page answers "how is today going", and the list below it is
+the raw drill-down.
 Both are computed in `src/lib/visit-queries.ts`; every timestamp in the
 admin (list rows, detail page, events table) renders on a Europe/Madrid
 clock regardless of the server's own timezone (`src/views/format.ts`).

@@ -53,10 +53,6 @@ export async function listSites(): Promise<Site[]> {
   return prisma.site.findMany({ orderBy: { id: "asc" } });
 }
 
-export async function getSiteById(id: string): Promise<Site | null> {
-  return prisma.site.findUnique({ where: { id } });
-}
-
 /** Every visit for a site, newest-active-first, offset-paginated (30/page),
  *  no filters — every client kind (human/search/ai/bot) is shown. `hasNext`
  *  comes from fetching one row past the page size rather than a COUNT(*).

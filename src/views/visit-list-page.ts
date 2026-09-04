@@ -1,5 +1,5 @@
 import type { Site } from "@prisma/client";
-import { escapeHtml, renderLayout } from "./layout";
+import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { countryEmoji, countryName, fmtDuration, fmtShortDateTime } from "./format";
 import type { SiteSummary, VisitListItem } from "../lib/visit-queries";
 
@@ -12,22 +12,8 @@ export interface VisitListPageData {
   summary: SiteSummary;
 }
 
-function topbar(sites: Site[], currentSiteId?: string): string {
-  const siteLinks = sites
-    .map((s) => `<a href="/?site=${escapeHtml(s.id)}" class="site-link${s.id === currentSiteId ? " active" : ""}">${escapeHtml(s.id)}</a>`)
-    .join("");
-  return `
-<header class="topbar">
-  <div class="topbar-inner">
-    <h1>📊 iq-metrix</h1>
-    ${siteLinks ? `<nav class="site-nav">${siteLinks}</nav>` : ""}
-    <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
-  </div>
-</header>`;
-}
-
 export function renderNoSitesPage(): string {
-  const body = `${topbar([])}<main class="placeholder">
+  const body = `${renderTopbar([])}<main class="placeholder">
     <p>⚠️ No sites configured yet.</p>
     <p class="muted">Run <code>npx prisma db seed</code> against this service's database, then reload.</p>
   </main>`;
@@ -36,13 +22,13 @@ export function renderNoSitesPage(): string {
 
 /** Four scalar stat cards — today's summary. Visits / Events / Identified
  *  count the current Madrid calendar day (00:00–23:59 Europe/Madrid); "Live
- *  now" is visitors active in the last few minutes. No charts, no top
- *  rankings, no filters — the numbers are the page's headline. */
+ *  now" is visitors active in the last few minutes. The day is implicit — no
+ *  "today" in the labels. Cards sit in one row even on a phone. */
 function renderSummary(s: SiteSummary): string {
   const cards: Array<{ label: string; value: string; live?: boolean }> = [
-    { label: "Visits · today", value: String(s.visitsToday) },
-    { label: "Events · today", value: String(s.eventsToday) },
-    { label: "Identified · today", value: String(s.emailsToday) },
+    { label: "Visits", value: String(s.visitsToday) },
+    { label: "Events", value: String(s.eventsToday) },
+    { label: "Identified", value: String(s.emailsToday) },
     { label: "Live now", value: String(s.liveNow), live: true },
   ];
   return `<section class="summary">${cards
@@ -165,7 +151,7 @@ function renderPagination(siteId: string, page: number, hasNext: boolean): strin
 }
 
 export function renderVisitListPage(data: VisitListPageData): string {
-  const body = `${topbar(data.sites, data.currentSite.id)}
+  const body = `${renderTopbar(data.sites, data.currentSite.id)}
 <main class="dashboard">
   ${renderSummary(data.summary)}
   ${renderTable(data.items)}

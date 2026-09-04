@@ -1,10 +1,11 @@
 import type { Event, Site, Visit } from "@prisma/client";
-import { escapeHtml, renderLayout } from "./layout";
+import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { asMetaKeysRegistry, coerceMeta, countryEmoji, deviceEmoji, fmtDateTime, fmtDuration, renderMetaChips } from "./format";
 
 // Separate page (GET /visits/:id), not a <dialog> opened from the list row.
-// Picked over a dialog because this app has no client JS at all: a native
-// <dialog> needs `.showModal()` (or the very new, not-yet-universal
+// Picked over a dialog because this app deliberately has no client JS
+// beyond the header's one-line domain-dropdown onchange: a native <dialog>
+// needs `.showModal()` (or the very new, not-yet-universal
 // popover/command-invoker attributes) to open, so "no JS framework" would
 // have quietly become "a few lines of vanilla JS, plus a no-JS fallback for
 // when it's disabled". A plain link to a plain page needs neither — it also
@@ -12,18 +13,8 @@ import { asMetaKeysRegistry, coerceMeta, countryEmoji, deviceEmoji, fmtDateTime,
 // the browser's own back button for free, and is one <a href> away from
 // every other server-rendered page in this app instead of a one-off pattern.
 
-function topbar(): string {
-  return `
-<header class="topbar">
-  <div class="topbar-inner">
-    <h1>📊 iq-metrix</h1>
-    <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
-  </div>
-</header>`;
-}
-
-export function renderVisitNotFoundPage(): string {
-  const body = `${topbar()}<main class="placeholder">
+export function renderVisitNotFoundPage(sites: Site[]): string {
+  const body = `${renderTopbar(sites)}<main class="placeholder">
     <p>⚠️ Visit not found.</p>
     <p><a href="/">← Back to visits</a></p>
   </main>`;
@@ -59,7 +50,7 @@ function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysReg
   return `<div class="viz"><div class="viz-row viz-head">${head}</div>${rows}</div>`;
 }
 
-export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site | null): string {
+export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site | null, sites: Site[]): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
   const meta = coerceMeta(visit.meta);
   const location = `${countryEmoji(visit.country)} ${escapeHtml(visit.country)}${visit.region ? ` · ${escapeHtml(visit.region)}` : ""}${visit.city ? ` · ${escapeHtml(visit.city)}` : ""}`;
@@ -84,7 +75,7 @@ export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site 
     kv("Device hash", `<code title="${escapeHtml(visit.hash)}">${escapeHtml(visit.hash.slice(0, 16))}…</code>`),
   ].join("");
 
-  const body = `${topbar()}
+  const body = `${renderTopbar(sites, visit.siteId)}
 <main class="dashboard">
   <p><a href="/?site=${escapeHtml(visit.siteId)}">← Back to visits</a></p>
   <section class="card detail">

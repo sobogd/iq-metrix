@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
-import { getSiteById, getVisitDetail } from "../lib/visit-queries";
+import { getVisitDetail, listSites } from "../lib/visit-queries";
 import { renderVisitDetailPage, renderVisitNotFoundPage } from "../views/visit-detail-page";
 
 export async function visitDetailRoutes(fastify: FastifyInstance): Promise<void> {
@@ -9,12 +9,12 @@ export async function visitDetailRoutes(fastify: FastifyInstance): Promise<void>
     if (!user) return;
 
     reply.type("text/html; charset=utf-8");
-    const detail = await getVisitDetail(request.params.id);
+    const [sites, detail] = await Promise.all([listSites(), getVisitDetail(request.params.id)]);
     if (!detail) {
       reply.code(404);
-      return reply.send(renderVisitNotFoundPage());
+      return reply.send(renderVisitNotFoundPage(sites));
     }
-    const site = await getSiteById(detail.visit.siteId);
-    return reply.send(renderVisitDetailPage(detail.visit, detail.events, site));
+    const site = sites.find((s) => s.id === detail.visit.siteId) ?? null;
+    return reply.send(renderVisitDetailPage(detail.visit, detail.events, site, sites));
   });
 }
