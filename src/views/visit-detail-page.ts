@@ -108,6 +108,15 @@ function renderRawDetails(visit: Visit): string {
   return `<details class="raw"><summary>Session ids &amp; exact timestamps</summary><div class="kv-grid">${fields}</div></details>`;
 }
 
+/** Latest meta snapshot block for the session head — shared by the detail
+ *  page and the delete-confirm page so both always show the same session. */
+function renderMetaBlock(visit: Visit, registry: ReturnType<typeof asMetaKeysRegistry>): string {
+  const meta = coerceMeta(visit.meta);
+  return Object.keys(meta).length > 0
+    ? `<div class="meta-block"><span class="k">Meta snapshot</span><div>${renderMetaChips(meta, registry)}</div></div>`
+    : "";
+}
+
 // ---------------------------------------------------------------------------
 // Event stream — one compact row per event, ordered by time. The visible
 // time (HH:MM:SS) is the ordering anchor; page / action / name flow inline
@@ -175,24 +184,50 @@ function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysReg
 
 export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site | null, sites: Site[]): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
-  const meta = coerceMeta(visit.meta);
-
-  // Meta snapshot stays visible on the head (latest values — an owner can
-  // switch mid-visit, which is why events also carry their own).
-  const metaBlock =
-    Object.keys(meta).length > 0
-      ? `<div class="meta-block"><span class="k">Meta snapshot</span><div>${renderMetaChips(meta, registry)}</div></div>`
-      : "";
 
   const body = `${renderTopbar(sites, visit.siteId)}
 <main class="dashboard">
   <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}">← Back to visits</a></p>
-  ${renderSessionHead(visit, events.length, metaBlock)}
+  ${renderSessionHead(visit, events.length, renderMetaBlock(visit, registry))}
   ${renderRawDetails(visit)}
   <section>
     <h2>Events (${events.length})</h2>
     ${renderEvents(events, registry)}
   </section>
+  <div class="detail-actions">
+    <a class="danger-link" href="/visits/${escapeHtml(visit.id)}/delete">Delete session</a>
+  </div>
 </main>`;
   return renderLayout(`Visit ${visit.id}`, body);
+}
+
+// ---------------------------------------------------------------------------
+// Delete-confirm page (GET /visits/:id/delete, POST executes). Destructive
+// and irreversible, so no-JS app gets no one-click delete: the session head
+// is re-rendered exactly as on the detail page so the admin sees precisely
+// what will be removed, and only the POST form on THIS page actually deletes
+// (the detail-page link is just a GET to here — it changes nothing). The
+// POST handler then redirects back to the site's session list.
+// ---------------------------------------------------------------------------
+
+export function renderVisitDeletePage(visit: Visit, eventsCount: number, site: Site | null, sites: Site[]): string {
+  const registry = asMetaKeysRegistry(site?.metaKeys);
+  const plural = eventsCount === 1 ? "event" : "events";
+  const body = `${renderTopbar(sites, visit.siteId)}
+<main class="dashboard">
+  <p class="crumb"><a href="/visits/${escapeHtml(visit.id)}">← Back to session</a></p>
+  ${renderSessionHead(visit, eventsCount, renderMetaBlock(visit, registry))}
+  <section class="confirm">
+    <h2>Delete this session?</h2>
+    <p class="muted">The session above and its ${eventsCount} ${plural} will be permanently removed from
+      ${escapeHtml(visit.siteId)}. This can't be undone.</p>
+    <div class="confirm-actions">
+      <a class="cancel-btn" href="/visits/${escapeHtml(visit.id)}">Cancel</a>
+      <form method="post" action="/visits/${escapeHtml(visit.id)}/delete">
+        <button class="delete-btn" type="submit">Delete session</button>
+      </form>
+    </div>
+  </section>
+</main>`;
+  return renderLayout(`Delete ${visit.id}`, body);
 }

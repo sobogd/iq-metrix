@@ -111,6 +111,11 @@ against, so the clients needed zero changes beyond their target URL.
   account, scrypt password hash, HMAC-signed `mtx_sess` cookie.
 - `GET /` — visit list.
 - `GET /visits/:id` — visit detail.
+- `GET /visits/:id/delete` — delete-confirm page (re-renders the session head,
+  changes nothing).
+- `POST /visits/:id/delete` — the only destructive step: permanently deletes
+  the session (events go via the FK cascade) and redirects to the site list.
+  State changes are form posts only, so no bare link can ever delete.
 - `GET /robots.txt`, `GET /style.css`.
 
 ## Cookieless mechanics
@@ -209,7 +214,11 @@ than a `COUNT(*)`. The whole row links to the visit detail.
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 Meta chips are rendered generically from the current site's `Site.metaKeys`
 registry; a key with a `{v}` link template renders as an external link to the
-source product's own admin, everything else as plain text.
+source product's own admin, everything else as plain text. A danger-outlined
+"Delete session" link at the bottom of the page leads to a JS-free confirm
+page (the same session head re-rendered, so you see exactly what goes); only
+the confirm page's POST actually deletes the visit and its events and
+redirects back to the site's session list.
 
 ## Who sends data here
 

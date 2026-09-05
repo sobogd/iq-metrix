@@ -2,8 +2,8 @@ import { type Event, type Site, type Visit } from "@prisma/client";
 import { prisma } from "../db";
 import { madridDayBounds } from "./madrid";
 
-// Read-only query layer for the admin pages (routes/home.ts,
-// routes/visit-detail.ts).
+// Query layer for the admin pages (routes/home.ts, routes/visit-detail.ts)
+// plus the one admin mutation the UI offers — the per-session delete.
 //
 // The dashboard is deliberately filter-free and chart-free. The summary
 // strip counts the CURRENT MADRID CALENDAR DAY (00:00–23:59, Europe/Madrid)
@@ -91,6 +91,21 @@ export async function getVisitDetail(id: string): Promise<{ visit: Visit; events
   if (!visit) return null;
   const events = await prisma.event.findMany({ where: { visitId: id }, orderBy: { at: "asc" } });
   return { visit, events };
+}
+
+/** Permanently deletes one session (a Visit row). Its Event rows go with it
+ *  via the FK cascade — `Event_visitId_fkey` is ON DELETE CASCADE in the
+ *  initial migration, so a single delete removes the whole session. Returns
+ *  the deleted visit's siteId (so the caller can redirect back to the right
+ *  site's list), or null when no such visit exists — e.g. a raced double
+ *  submit of the delete form. */
+export async function deleteVisit(id: string): Promise<string | null> {
+  const visit = await prisma.visit.findUnique({ where: { id }, select: { siteId: true } });
+  if (!visit) return null;
+  // deleteMany (not delete) so a visit vanishing between the lookup and here
+  // (double submit / someone else deleting) no-ops instead of throwing P2025.
+  await prisma.visit.deleteMany({ where: { id } });
+  return visit.siteId;
 }
 
 /** Site-level numeric summary for the dashboard header. Deliberately NOT
