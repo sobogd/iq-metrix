@@ -55,8 +55,9 @@ function kvCode(label: string, value: string, keep = 24): string {
 
 /** Chips for the head's tag row. Order matches the list rows: app (when the
  *  site uses sub-apps), OS, tablet, via/from source, theme, lang, then the
- *  activity duration; a red non-human pill is appended for crawler traffic
- *  (detail page only — the list deliberately stays clean of it). */
+ *  activity-window length (the list swaps that pill for the last-activity
+ *  time on line 2, and keeps the client pill on line 1 before the event
+ *  count); the red non-human pill closes the head's own tag row. */
 function renderHeadTags(visit: Visit): string {
   const tags: string[] = [];
   if (visit.app) tags.push(chip("tag-muted", visit.app));

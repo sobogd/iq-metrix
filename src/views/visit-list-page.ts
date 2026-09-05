@@ -1,7 +1,7 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
-import { countryEmoji, countryName, fmtDuration, fmtShortDateTime } from "./format";
-import { chip, deviceChip, osChip, sourceChip, themeChip } from "./tags";
+import { countryEmoji, countryName, fmtShortDateTime } from "./format";
+import { chip, clientChip, deviceChip, osChip, sourceChip, themeChip } from "./tags";
 import type { SiteSummary, VisitListItem } from "../lib/visit-queries";
 
 export interface VisitListPageData {
@@ -44,13 +44,17 @@ function renderSummary(s: SiteSummary): string {
 
 // ---------------------------------------------------------------------------
 // Compact visit rows — three short lines per session:
-//   line 1: flag + country · region · city ......... date/time + event count
+//   line 1: flag + country · region · city ......... client pill + event count
+//           (the red non-human pill — search/AI/preview/bot — sits on the
+//           right edge right before "N evt"; humans get nothing there)
 //   line 2: colored TEXT tags (no emoji): OS, "Tablet" only when it really
-//          is one, source (via referrer / from), theme, lang, duration
+//          is one, source (via referrer / from), theme, lang, then the last
+//          activity time — it moved down from line 1 and replaced the old
+//          session-duration pill, which is gone from the list entirely
 //   line 3: the email tag — only when the visit is identified; anonymous
 //          sessions get no line at all.
-// No app/landing label, no first page, no UA client classification — all of
-// that only confused the list. The whole row links to the visit detail.
+// No app/landing label and no entry page — both only confused the list.
+// The whole row links to the visit detail.
 // ---------------------------------------------------------------------------
 
 function renderRow(item: VisitListItem): string {
@@ -62,18 +66,20 @@ function renderRow(item: VisitListItem): string {
   tags.push(sourceChip(item.from, item.ref));
   tags.push(themeChip(item.theme));
   if (item.lang) tags.push(chip("tag-muted", item.lang));
-  tags.push(chip("tag-muted", fmtDuration(item.firstAt, item.lastAt)));
+  tags.push(chip("tag-muted", fmtShortDateTime(item.lastAt)));
   const tagsHtml = tags.join("")
     ? `<div class="visit-tags">${tags.join("")}</div>`
     : "";
 
   // Anonymous sessions get no identity line at all — nothing is written.
   const idHtml = item.email ? `<div class="visit-id">${chip("tag-email", item.email)}</div>` : "";
+  // Red non-human pill ("" for humans) on line 1, right before the event count.
+  const clientHtml = clientChip(item.client, item.clientReason);
 
   return `
   <a class="visit-row" href="/visits/${escapeHtml(item.id)}">
     <div class="visit-geo"><span class="visit-flag">${countryEmoji(item.country)}</span><span class="visit-location">${escapeHtml(geo)}</span></div>
-    <div class="visit-meta"><time>${fmtShortDateTime(item.lastAt)}</time><span class="visit-events">${item.eventCount} evt</span></div>
+    <div class="visit-meta">${clientHtml}<span class="visit-events">${item.eventCount} evt</span></div>
     ${tagsHtml}
     ${idHtml}
   </a>`;

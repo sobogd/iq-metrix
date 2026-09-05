@@ -195,21 +195,25 @@ clock regardless of the server's own timezone (`src/views/format.ts`).
 
 The visit list is one compact row per session, up to three short lines:
 the first shows location — flag + `Country · Region · City` — with the
-date/time and event count pinned to the right edge; the second is a row of
-colored text tags (no emoji): OS (Windows/macOS/iOS/Android — the device
-form factor is implied), a `Tablet` chip only when the visit really came
-from a tablet (a tablet keeps the same OS name, so that one case is worth
-calling out), the source (`via <referrer>` or `from <campaign>` when one
-exists), light/dark theme, language and duration; the third appears only
+event count pinned to the right edge, preceded by the red non-human pill
+(`ai`/`search`/`preview`/`bot`, tooltip carries the classification reason)
+whenever the visit is not human — human sessions get nothing there; the
+second is a row of colored text tags (no emoji): OS
+(Windows/macOS/iOS/Android — the device form factor is implied), a
+`Tablet` chip only when the visit really came from a tablet (a tablet
+keeps the same OS name, so that one case is worth calling out), the source
+(`via <referrer>` or `from <campaign>` when one exists), light/dark theme,
+language and the last-activity time — the time moved down from line 1 and
+replaced the session-duration pill, which is not shown in the list anymore
+(the window length still lives on the detail page); the third appears only
 for
 identified sessions and carries the email tag — anonymous rows get no
-identity line at all. No app/landing label, no entry page and no UA client
-classification (search/AI/bot) are shown — that kind of labeling only
-misfires and confused the list. All traffic is still stored and listed —
-human, search-engine, AI-agent and other-bot visits alike — with no lens
-to hide any of it. Pagination is plain `<a href>` links, offset-based
-(30/page), with `hasNext` from fetching one row past the page size rather
-than a `COUNT(*)`. The whole row links to the visit detail.
+identity line at all. No app/landing label and no entry page are shown.
+All traffic is still stored and listed — human, search-engine, AI-agent
+and other-bot visits alike — with no lens to hide any of it. Pagination is
+plain `<a href>` links, offset-based (30/page), with `hasNext` from
+fetching one row past the page size rather than a `COUNT(*)`. The whole
+row links to the visit detail.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 Meta chips are rendered generically from the current site's `Site.metaKeys`

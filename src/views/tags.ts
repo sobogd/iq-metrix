@@ -51,9 +51,10 @@ export function themeChip(theme: string | null): string {
   return t ? chip(t.cls, t.text) : "";
 }
 
-/** Non-human traffic (search engine, AI crawler, link preview, bot) — shown
- *  on the detail page only (never the list): a small red pill whose tooltip
- *  carries the classification reason token. */
+/** Non-human traffic (search engine, AI crawler, link preview, bot) — a
+ *  small red pill whose tooltip carries the classification reason token.
+ *  Rendered on the session detail head and on a sessions-list row's first
+ *  line, right before the event count. */
 export function clientChip(client: string | null, reason: string | null): string {
   if (!client || client === "human") return "";
   const title = reason ? ` title="${escapeHtml(reason)}"` : "";

@@ -33,6 +33,9 @@ export interface VisitListItem {
   ref: string | null;
   app: string | null;
   client: string | null;
+  /** Why `client` got that label ("token:gptbot", "dns:googlebot.com", …) —
+   *  the tooltip on the non-human pill. */
+  clientReason: string | null;
   /** Denormalized latest meta snapshot (Visit.meta, jsonb). Coerced in the view. */
   meta: unknown;
   /** How many anonymous rows were folded into this one. */
@@ -66,7 +69,7 @@ export async function listVisits(
     SELECT
       v.id, v."siteId", v."firstAt", v."lastAt", v.device, v.os,
       v.country, v.region, v.city, v.lang, v.email, v.theme, v.from, v.ref, v.app,
-      v."client", v."meta", v."mergeCount",
+      v."client", v."clientReason", v."meta", v."mergeCount",
       e."eventCount", e."pageCount", e."firstPage", e."lastPage"
     FROM "Visit" v
     LEFT JOIN LATERAL (
