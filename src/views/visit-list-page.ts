@@ -44,17 +44,18 @@ function renderSummary(s: SiteSummary): string {
 
 // ---------------------------------------------------------------------------
 // Compact visit rows — three short lines per session:
-//   line 1: flag + country · region · city ......... classifier pill + events
+//   line 1: flag + country · region · city ......... referrer/type pill + evts
 //           (the location truncates to one line — full string in the title;
-//           "search" verdicts split on the referrer: WITH one it is a genuine
-//           search click-through and the green "via <referrer>" chip is shown
-//           INSTEAD of a generic pill, WITHOUT one the engine's own crawler
-//           gets a red "search crawler" pill; ai/preview/bot keep their plain
-//           red pill; humans get nothing there)
+//           a real referrer REPLACES the type tag: green "via <referrer>"
+//           chip whenever one exists. Only with no referrer does the type
+//           tag show — "search" verdicts get a red "search crawler" pill
+//           (the engine's own crawler), ai/preview/bot their plain red pill,
+//           humans nothing)
 //   line 2: colored TEXT tags (no emoji) — the last-activity time FIRST,
-//          then OS, "Tablet" only when it really is one, source (via/from),
-//          theme, lang. The session-duration pill is gone from the list;
-//          long referrer/geo text truncates instead of spreading the row.
+//          then OS, "Tablet" only when it really is one, the "from" source,
+//          theme, lang. "via <referrer>" never repeats here — line 1 owns it.
+//          The session-duration pill is gone from the list; long referrer /
+//          geo text truncates instead of spreading the row.
 //   line 3: the email tag — only when the visit is identified; anonymous
 //          sessions get no line at all.
 // No app/landing label and no entry page — both only confused the list.
@@ -65,19 +66,19 @@ function renderRow(item: VisitListItem): string {
   const geo = [countryName(item.country), item.region, item.city].filter(Boolean).join(" · ");
 
   // Line-1 right edge, before the event count — see the grammar above.
-  const clientHtml =
-    item.client === "search"
-      ? item.ref
-        ? sourceChip(null, item.ref)
-        : searchCrawlerChip(item.clientReason)
+  const clientHtml = item.ref
+    ? sourceChip(null, item.ref) // a real referrer instead of any type tag
+    : item.client === "search"
+      ? searchCrawlerChip(item.clientReason)
       : clientChip(item.client, item.clientReason);
 
   const tags: string[] = [];
   tags.push(chip("tag-muted", fmtShortDateTime(item.lastAt))); // activity time first
   tags.push(osChip(item.os));
   tags.push(deviceChip(item.device));
-  // Skip the source chip for search-with-referrer — line 1 already shows it.
-  if (item.client !== "search" || !item.ref) tags.push(sourceChip(item.from, item.ref));
+  // "via <ref>" lives on line 1 when a referrer exists — never repeat it in
+  // the chip row; here the source chip only ever carries "from <campaign>".
+  if (!item.ref) tags.push(sourceChip(item.from, item.ref));
   tags.push(themeChip(item.theme));
   if (item.lang) tags.push(chip("tag-muted", item.lang));
   const tagsHtml = tags.join("")

@@ -56,9 +56,9 @@ function kvCode(label: string, value: string, keep = 24): string {
 /** Chips for the head's tag row. Order matches the list rows: app (when the
  *  site uses sub-apps), OS, tablet, via/from source, theme, lang, then the
  *  activity-window length — the list's own tag row opens with the
- *  last-activity time instead and drops the duration pill, while its
- *  non-human client pill lives on line 1 before the event count; the red
- *  non-human pill closes the head's own tag row. */
+ *  last-activity time instead and drops the duration pill, and its line 1
+ *  shows the referrer (or the type pill when there is none) before the
+ *  event count; the red non-human pill closes the head's own tag row. */
 function renderHeadTags(visit: Visit): string {
   const tags: string[] = [];
   if (visit.app) tags.push(chip("tag-muted", visit.app));

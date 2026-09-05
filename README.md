@@ -196,20 +196,20 @@ clock regardless of the server's own timezone (`src/views/format.ts`).
 The visit list is one compact row per session, up to three short lines:
 the first shows location — flag + `Country · Region · City` (truncated to a
 single line, full string on hover) — with the event count pinned to the
-right edge. What sits before that count depends on the client verdict: a
-`search` verdict splits on the referrer — no referrer means the engine's
-own crawler fetched the page and gets a red `search crawler` pill; a
-referrer means a genuine search click-through and is shown as that green
-`via <referrer>` chip instead of any red pill (long referrers truncate,
-full value on hover). `ai`/`preview`/`bot` keep their plain red pill;
-humans get nothing there. The second line is a row of colored text tags
-(no emoji) that opens with the last-activity time, then OS
-(Windows/macOS/iOS/Android — the device form factor is implied), a
-`Tablet` chip only when the visit really came from a tablet (a tablet
-keeps the same OS name, so that one case is worth calling out), the source
-(`via <referrer>` or `from <campaign>` when one exists), light/dark theme
-and language — the old session-duration pill is gone from the list (the
-window length still lives on the detail page); the third appears only for
+right edge. What sits before that count: the referrer whenever the visit
+has one — a green `via <referrer>` chip (genuine referral traffic) shown
+instead of any classifier type pill, truncated with the full value on
+hover; only with no referrer does the type tag show — a `search` verdict
+gets a red `search crawler` pill (the engine's own crawler fetching the
+page), `ai`/`preview`/`bot` their plain red pill, humans nothing. The
+second line is a row of colored text tags (no emoji) that opens with the
+last-activity time, then OS (Windows/macOS/iOS/Android — the device form
+factor is implied), a `Tablet` chip only when the visit really came from a
+tablet (a tablet keeps the same OS name, so that one case is worth calling
+out), the `from <campaign>` tag when one exists (`via <referrer>` is never
+repeated here — line 1 owns it), light/dark theme and language — the old
+session-duration pill is gone from the list (the window length still lives
+on the detail page); the third appears only for
 identified sessions and carries the email tag — anonymous rows get no
 identity line at all. No app/landing label and no entry page are shown.
 All traffic is still stored and listed — human, search-engine, AI-agent

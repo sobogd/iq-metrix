@@ -54,8 +54,8 @@ export function themeChip(theme: string | null): string {
 
 /** Non-human traffic (search engine, AI crawler, link preview, bot) — a
  *  small red pill whose tooltip carries the classification reason token.
- *  Rendered on the session detail head and on a sessions-list row's first
- *  line, right before the event count. */
+ *  Rendered on the session detail head, and on a sessions-list row's first
+ *  line — but there only when the visit has no referrer to show instead. */
 export function clientChip(client: string | null, reason: string | null): string {
   if (!client || client === "human") return "";
   const title = reason ? ` title="${escapeHtml(reason)}"` : "";
@@ -63,9 +63,9 @@ export function clientChip(client: string | null, reason: string | null): string
 }
 
 /** "Search crawler" pill — a `search` verdict that arrived with NO referrer:
- *  the search engine's own crawler indexing the page. A search verdict that
- *  DOES carry a referrer is a genuine search click-through and is shown on
- *  the sessions list as that referrer (green "via …") instead of this pill. */
+ *  the search engine's own crawler indexing the page. Whenever a visit has a
+ *  real referrer the sessions list shows that referrer (green "via …")
+ *  instead of any type pill — see visit-list-page.ts. */
 export function searchCrawlerChip(reason: string | null): string {
   const title = reason ? ` title="${escapeHtml(reason)}"` : "";
   return `<span class="tag tag-bot"${title}>search crawler</span>`;
