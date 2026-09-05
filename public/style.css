@@ -258,7 +258,8 @@ code {
   border-color: var(--accent);
 }
 
-/* Line 1 — location (left) + date/event count (right) */
+/* Line 1 — location (left, truncating) + classifier/referrer pill & event
+   count (right) */
 .visit-geo {
   display: flex;
   align-items: baseline;
@@ -279,6 +280,16 @@ code {
   overflow-wrap: anywhere;
 }
 
+/* In list rows the location must stay on ONE line no matter how long the
+   region name is: ellipsis-truncate it, full string rides in the title. */
+.visit-row .visit-location {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+
 .visit-meta {
   display: inline-flex;
   align-items: baseline;
@@ -287,6 +298,12 @@ code {
   font-size: 13px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* A long "via <referrer>" chip on line 1 truncates instead of stretching
+   the row — the .tag ellipsis kicks in once the width is capped. */
+.visit-meta .tag {
+  max-width: 200px;
 }
 
 .visit-events {

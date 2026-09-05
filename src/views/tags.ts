@@ -39,11 +39,12 @@ export function deviceChip(device: string | null): string {
 
 /** Source chip: the referrer when there is one, otherwise the `from` tag.
  *  UA client classification (search/AI/bot) is deliberately NOT part of this
- *  pill — it misfires on non-browser tools and only confuses the list. */
+ *  pill — it misfires on non-browser tools and only confuses the list. Long
+ *  values truncate to one line via CSS, so the title carries the full text. */
 export function sourceChip(from: string | null, ref: string | null): string {
-  if (ref) return chip("tag-source", `via ${ref}`);
-  if (from) return chip("tag-source", `from ${from}`);
-  return "";
+  const raw = ref ? `via ${ref}` : from ? `from ${from}` : "";
+  if (!raw) return "";
+  return `<span class="tag tag-source" title="${escapeHtml(raw)}">${escapeHtml(raw)}</span>`;
 }
 
 export function themeChip(theme: string | null): string {
@@ -59,4 +60,13 @@ export function clientChip(client: string | null, reason: string | null): string
   if (!client || client === "human") return "";
   const title = reason ? ` title="${escapeHtml(reason)}"` : "";
   return `<span class="tag tag-bot"${title}>${escapeHtml(client)}</span>`;
+}
+
+/** "Search crawler" pill — a `search` verdict that arrived with NO referrer:
+ *  the search engine's own crawler indexing the page. A search verdict that
+ *  DOES carry a referrer is a genuine search click-through and is shown on
+ *  the sessions list as that referrer (green "via …") instead of this pill. */
+export function searchCrawlerChip(reason: string | null): string {
+  const title = reason ? ` title="${escapeHtml(reason)}"` : "";
+  return `<span class="tag tag-bot"${title}>search crawler</span>`;
 }
