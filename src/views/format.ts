@@ -1,5 +1,5 @@
 import { escapeHtml } from "./layout";
-import { madridBoundsFromKey, madridDayKey, madridYmd, shiftMadridDay } from "../lib/madrid";
+import { madridBoundsFromKey, madridYmd } from "../lib/madrid";
 
 // Small, dependency-free presentation helpers shared by the visit list and
 // visit detail pages. Emoji instead of icon fonts, per the project's CSS
@@ -87,14 +87,11 @@ export function fmtDayLabel(d: Date): string {
   }).format(d);
 }
 
-/** Heading for the list's day navigator: "Today" for the current Madrid day,
- *  "Yesterday" for the previous one, otherwise the Madrid date as
- *  "Fri, 04 Sep" — plus the year once the day is no longer in the current
- *  one (so a jump across New Year never reads as this year's date). */
+/** The selected day as a plain date ("Fri, 04 Sep", plus the year once the
+ *  day is no longer in the current one) — the list's caption. No
+ *  "Today"/"Yesterday" synonyms anymore: the date is picked in the header's
+ *  calendar and the caption says exactly which day is shown. */
 export function fmtDayHeading(key: string, now: Date = new Date()): string {
-  const today = madridDayKey(now);
-  if (key === today) return "Today";
-  if (shiftMadridDay(key, 1) === today) return "Yesterday";
   const bounds = madridBoundsFromKey(key);
   if (!bounds) return key;
   const opts: Intl.DateTimeFormatOptions = {

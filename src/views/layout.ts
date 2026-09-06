@@ -1,4 +1,5 @@
 import type { Site } from "@prisma/client";
+import { madridDayKey } from "../lib/madrid";
 
 export function escapeHtml(input: string): string {
   return input
@@ -9,34 +10,64 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Shared page header: logo emoji only (no title text), then the site
- *  selector (options are the site ids — iq-rest, iq-translate, …), then two
- *  icon buttons on the right — sign-out (a POST form — state changes stay
- *  form posts in this app) and refresh (a plain link to the current request
- *  URL, which is what makes it reload — no JS needed). The selector is a
- *  native <select> whose options are self-navigating URLs; the inline
- *  onchange is the app's only client JS. When a Madrid day is selected in
- *  the list header (`dayKey`), switching site keeps that day. */
+/** One borderless emoji header button. Calendar / company mount a NATIVE
+ *  control (real <input type="date"> / <select>) invisibly over the emoji,
+ *  so clicking the emoji opens the browser's own date picker / dropdown —
+ *  no custom chrome. The three one-line inline handlers on those controls
+ *  (and on logout's confirm) are the app's only client JS. */
+function tbButton(face: string, label: string, controlBody: string): string {
+  return `
+    <span class="tb-ico" title="${label}" aria-label="${label}">
+      ${controlBody}
+      <span class="tb-face" aria-hidden="true">${face}</span>
+    </span>`;
+}
+
+/** Shared page header — left: logo + the selected company's id in bold
+ *  (truncating); right: a row of borderless emoji buttons — refresh,
+ *  calendar (native date picker), company (native select), sign-out (with a
+ *  native confirm). The selected Madrid day (`dayKey`) is kept when changing
+ *  company or picking a date. */
 export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: string, refreshHref = "/"): string {
-  const day = dayKey ? `&day=${escapeHtml(dayKey)}` : "";
+  const siteId = currentSiteId ?? sites[0]?.id ?? "";
+  const day = (dayKey ?? madridDayKey(new Date())) as string;
+
+  const refresh = `<a class="tb-ico" href="${escapeHtml(refreshHref)}" title="Refresh" aria-label="Refresh"><span class="tb-face" aria-hidden="true">🔄</span></a>`;
+
+  const dayPrefix = escapeHtml(`/?site=${siteId}&day=`);
+  const calendar = tbButton(
+    "📅",
+    "Pick a date",
+    `<input type="date" class="tb-ghost" aria-label="Pick a date" value="${escapeHtml(day)}" onchange="location.href='${dayPrefix}'+encodeURIComponent(this.value)" />`,
+  );
+
   const options = sites
     .map(
       (s) =>
-        `<option value="/?site=${escapeHtml(s.id)}${day}"${s.id === currentSiteId ? " selected" : ""}>${escapeHtml(s.id)}</option>`,
+        `<option value="${escapeHtml(`/?site=${s.id}&day=${day}`)}"${s.id === siteId ? " selected" : ""}>${escapeHtml(s.id)}</option>`,
     )
     .join("");
-  const select =
+  const company =
     sites.length > 0
-      ? `<select class="site-select" aria-label="Domain" onchange="location.href=this.value">${options}</select>`
+      ? tbButton(
+          "🏢",
+          "Pick a company",
+          `<select class="tb-ghost" aria-label="Pick a company" onchange="location.href=this.value">${options}</select>`,
+        )
       : "";
+
+  const logout = `<form method="post" action="/logout" onsubmit="return confirm('Sign out?')"><button type="submit" class="tb-ico" title="Sign out" aria-label="Sign out"><span class="tb-face" aria-hidden="true">🚪</span></button></form>`;
+
   return `
 <header class="topbar">
   <div class="topbar-inner">
     <a class="logo" href="/" aria-label="iq-metrix">📊</a>
-    ${select}
+    ${siteId ? `<span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>` : ""}
     <div class="topbar-actions">
-      <form method="post" action="/logout"><button type="submit" class="icon-btn" title="Sign out" aria-label="Sign out">🚪</button></form>
-      <a class="icon-btn" href="${escapeHtml(refreshHref)}" title="Refresh" aria-label="Refresh">🔄</a>
+      ${refresh}
+      ${calendar}
+      ${company}
+      ${logout}
     </div>
   </div>
 </header>`;

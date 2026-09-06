@@ -50,9 +50,11 @@ a {
 
 /* ---------- Top bar (signed-in pages) ---------- *
  *
- * One row even on a phone: logo (emoji only) on the left, the domain
- * <select> growing to fill the middle (navigates on change — the app's only
- * inline JS), sign-out pinned to the right. No title text, no wrapping.
+ * One row even on a phone: logo (emoji) + the selected company id in bold on
+ * the left (truncating), then borderless emoji buttons on the right —
+ * refresh 🔄, calendar 📅 (native date picker), company 🏢 (native select),
+ * sign-out 🚪 (native confirm before the POST). The ghost controls are real
+ * native inputs laid invisibly over their emoji faces.
  */
 
 .topbar {
@@ -66,8 +68,8 @@ a {
 .topbar-inner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
+  gap: 12px;
+  padding: 8px 16px;
   max-width: var(--max-width);
   margin: 0 auto;
 }
@@ -79,20 +81,16 @@ a {
   text-decoration: none;
 }
 
-.site-select {
+/* The selected company id — bold, truncating so the row never overflows. */
+.topbar-id {
   flex: 1 1 auto;
   min-width: 0;
-  font: inherit;
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.site-select:focus {
-  outline: none;
-  border-color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-inner form {
@@ -100,38 +98,72 @@ a {
   margin: 0;
 }
 
-/* Right-side icon buttons — sign-out (a form POST) and refresh (a plain
-   link to the current URL). Square, transparent, borderless until hover. */
+/* Borderless emoji header buttons — no borders, comfortable spacing, hover
+   just darkens a round area. */
 .topbar-actions {
   flex: 0 0 auto;
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
 }
 
-.icon-btn {
+.tb-ico {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
   background: transparent;
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 0;
+  border-radius: 12px;
   text-decoration: none;
   cursor: pointer;
 }
 
-button.icon-btn:hover,
-a.icon-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+button.tb-ico,
+a.tb-ico {
+  border: 0;
+  background: transparent;
   filter: none;
+}
+
+.tb-ico:hover {
+  background: var(--panel-2);
+  filter: none;
+}
+
+.tb-ico:focus-visible,
+.tb-ghost:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* Native controls laid invisibly over the emoji faces (date / company). */
+.tb-ghost {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+select.tb-ghost {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.tb-face {
+  pointer-events: none;
 }
 
 /* ---------- Buttons / links-as-buttons ---------- */
@@ -643,12 +675,36 @@ a.chip:hover {
 }
 
 /* The visit detail's top tools row — back on the left, delete on the right,
-   both as icon buttons (same .icon-btn style as the topbar). */
+   both as bordered icon buttons. */
 .detail-tools {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.icon-btn:hover,
+button.icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  filter: none;
 }
 
 .icon-btn-danger {
@@ -892,58 +948,14 @@ button.delete-btn:hover {
   filter: none;
 }
 
-/* ---------- Day navigator (list header) ---------- *
- *
- * One Madrid calendar day per page: left/right arrows step a day at a time,
- * the heading names the day (Today / Yesterday / a date) and, when it isn't
- * today, doubles as a "back to today" link. Next is disabled on today.
- */
-
-.daynav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-}
-
-.day-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 17px;
-  line-height: 1;
-  text-decoration: none;
-  user-select: none;
-}
-
-a.day-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.day-btn-off {
-  opacity: 0.35;
-  pointer-events: none;
-}
-
-.day-heading {
-  min-width: 200px;
+/* Quiet caption above the stats saying which Madrid day is showing — the day
+   is picked in the header's 📅 native date control, no arrows/synonyms. */
+.list-day {
+  margin: 0;
   text-align: center;
-  font-size: 19px;
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1.2;
   color: var(--text);
-  text-decoration: none;
-}
-
-a.day-heading:hover {
-  color: var(--accent);
 }
 
 /* ---------- Summary strip (numeric cards, no charts) ---------- */

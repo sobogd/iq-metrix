@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
 import { getDaySummary, listSites, listVisits, markVisitsSeen } from "../lib/visit-queries";
-import { madridBoundsFromKey, madridDayKey, shiftMadridDay } from "../lib/madrid";
+import { madridBoundsFromKey, madridDayKey } from "../lib/madrid";
 import { fmtDayHeading } from "../views/format";
 import { renderNoSitesPage, renderVisitListPage } from "../views/visit-list-page";
 
@@ -9,14 +9,13 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-/** GET / — one Madrid calendar day, chosen in the header's date navigator
- *  (?day=YYYY-MM-DD, default today): the summary strip counts that day
+/** GET / — one Madrid calendar day (?day=YYYY-MM-DD, default today), picked
+ *  in the header's 📅 native date control: the summary strip counts that day
  *  (Visits/Events/Identified), and the list below it is every session that
  *  had activity during it — no pagination, the list IS the day. A session
  *  whose events the admin has not seen yet shows a green "new" dot; the list
- *  marks what it returns as seen (Event.seen). The only query knobs left are
- *  the topbar site switch (which keeps the day) and the arrows/heading of
- *  the navigator. */
+ *  marks what it returns as seen (Event.seen). The only knobs left are the
+ *  header's company picker (which keeps the day) and the calendar itself. */
 export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get("/", async (request, reply) => {
     const user = requireAdmin(request, reply);
@@ -55,10 +54,6 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
         items,
         dayKey,
         heading: fmtDayHeading(dayKey, now),
-        prevKey: shiftMadridDay(dayKey, -1),
-        nextKey: shiftMadridDay(dayKey, 1),
-        todayKey,
-        canNext: dayKey < todayKey,
         summary,
         refreshHref: request.url,
       }),

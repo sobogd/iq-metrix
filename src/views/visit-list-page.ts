@@ -26,17 +26,12 @@ export interface VisitListPageData {
   sites: Site[];
   currentSite: Site;
   items: VisitListItem[];
-  /** Selected Madrid day as "YYYY-MM-DD" — the day the stats and list show. */
+  /** Selected Madrid day as "YYYY-MM-DD" — the day the stats and list show.
+   *  Picked via the header's 📅 native date control. */
   dayKey: string;
-  /** Same day as "Today" / "Yesterday", else "Fri, 04 Sep" (+ year when not
-   *  the current one) — computed on the Madrid clock. */
+  /** The selected day as a plain date ("Fri, 04 Sep" + year when not the
+   *  current one) — a quiet caption above the stats. */
   heading: string;
-  /** Neighbouring days for the arrows, and today's key for the heading link. */
-  prevKey: string;
-  nextKey: string;
-  todayKey: string;
-  /** Next arrow is disabled once the selected day IS today — no future days. */
-  canNext: boolean;
   summary: DaySummary;
   /** Current request URL — the topbar's refresh icon links here to reload. */
   refreshHref: string;
@@ -51,33 +46,14 @@ export function renderNoSitesPage(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Day navigator — sits above the summary. One Madrid calendar day per page:
-// left/right arrows step a day at a time, the heading names the day ("Today",
-// "Yesterday", else a date) and, when it isn't today, doubles as a "back to
-// today" link. There is no lower bound — past days are all reachable; the
-// future is not (next is disabled on today).
+// Day caption — the header's 📅 calendar picks the Madrid day; this quiet
+// caption above the stats simply says which day is showing. No arrows, no
+// synonyms — the date is the date.
 // ---------------------------------------------------------------------------
 
-function renderDayNav(data: Pick<VisitListPageData, "currentSite" | "dayKey" | "heading" | "prevKey" | "nextKey" | "todayKey" | "canNext">): string {
-  const base = (key: string) => `/?site=${escapeHtml(data.currentSite.id)}&day=${escapeHtml(key)}`;
-  const next = data.canNext
-    ? `<a class="day-btn" href="${base(data.nextKey)}" aria-label="Next day">→</a>`
-    : `<span class="day-btn day-btn-off" aria-hidden="true">→</span>`;
-  const heading = data.dayKey === data.todayKey
-    ? `<span class="day-heading">${escapeHtml(data.heading)}</span>`
-    : `<a class="day-heading" href="${base(data.todayKey)}" title="Back to today">${escapeHtml(data.heading)}</a>`;
-  return `
-  <nav class="daynav" aria-label="Pick a day">
-    <a class="day-btn" href="${base(data.prevKey)}" aria-label="Previous day">←</a>
-    ${heading}
-    ${next}
-  </nav>`;
-}
-
 /** Scalar stat cards for the selected day — Visits / Events / Identified.
- *  There is deliberately no live number: liveness is per-row, shown as the
- *  green border on sessions that fired in the last ~30 minutes. Cards sit in
- *  one row even on a phone. */
+ *  There is deliberately no live number: "live" is the green 🟢 dot on rows
+ *  with unseen events. Cards sit in one row even on a phone. */
 function renderSummary(s: DaySummary): string {
   const cards: Array<{ label: string; value: string }> = [
     { label: "Visits", value: String(s.visits) },
@@ -177,7 +153,7 @@ function renderTable(items: VisitListItem[], dayKey: string): string {
 export function renderVisitListPage(data: VisitListPageData): string {
   const body = `${renderTopbar(data.sites, data.currentSite.id, data.dayKey, data.refreshHref)}
 <main class="dashboard">
-  ${renderDayNav(data)}
+  <p class="list-day">${escapeHtml(data.heading)}</p>
   ${renderSummary(data.summary)}
   ${renderTable(data.items, data.dayKey)}
 </main>`;
