@@ -1,4 +1,5 @@
 import { escapeHtml } from "./layout";
+import { madridBoundsFromKey, madridDayKey, madridYmd, shiftMadridDay } from "../lib/madrid";
 
 // Small, dependency-free presentation helpers shared by the visit list and
 // visit detail pages. Emoji instead of icon fonts, per the project's CSS
@@ -70,6 +71,26 @@ export function fmtDayLabel(d: Date): string {
     month: "short",
     year: "numeric",
   }).format(d);
+}
+
+/** Heading for the list's day navigator: "Today" for the current Madrid day,
+ *  "Yesterday" for the previous one, otherwise the Madrid date as
+ *  "Fri, 04 Sep" — plus the year once the day is no longer in the current
+ *  one (so a jump across New Year never reads as this year's date). */
+export function fmtDayHeading(key: string, now: Date = new Date()): string {
+  const today = madridDayKey(now);
+  if (key === today) return "Today";
+  if (shiftMadridDay(key, 1) === today) return "Yesterday";
+  const bounds = madridBoundsFromKey(key);
+  if (!bounds) return key;
+  const opts: Intl.DateTimeFormatOptions = {
+    timeZone: MADRID_TZ,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  };
+  if (madridYmd(bounds.start).y !== madridYmd(now).y) opts.year = "numeric";
+  return new Intl.DateTimeFormat("en-GB", opts).format(bounds.start);
 }
 
 /** Human duration between two timestamps: "42s", "3m", "1h 12m", "2d 4h". */

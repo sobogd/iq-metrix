@@ -26,10 +26,17 @@ import { chip, clientChip, deviceChip, osChip, pageChip, sourceChip, themeChip }
 // the browser's own back button for free, and is one <a href> away from
 // every other server-rendered page in this app instead of a one-off pattern.
 
-export function renderVisitNotFoundPage(sites: Site[]): string {
+/** "&day=YYYY-MM-DD" query suffix when the admin came from a specific Madrid
+ *  day in the list — the back links keep them on that day. */
+function dayQuery(dayKey?: string): string {
+  return dayKey ? `&day=${escapeHtml(dayKey)}` : "";
+}
+
+export function renderVisitNotFoundPage(sites: Site[], dayKey?: string): string {
+  const back = dayKey ? `/?day=${escapeHtml(dayKey)}` : "/";
   const body = `${renderTopbar(sites)}<main class="placeholder">
     <p>⚠️ Visit not found.</p>
-    <p><a href="/">← Back to visits</a></p>
+    <p><a href="${back}">← Back to visits</a></p>
   </main>`;
   return renderLayout("Not found", body);
 }
@@ -184,12 +191,18 @@ function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysReg
   return `<div class="evt-list">${rows.join("")}</div>`;
 }
 
-export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site | null, sites: Site[]): string {
+export function renderVisitDetailPage(
+  visit: Visit,
+  events: Event[],
+  site: Site | null,
+  sites: Site[],
+  dayKey?: string,
+): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
 
-  const body = `${renderTopbar(sites, visit.siteId)}
+  const body = `${renderTopbar(sites, visit.siteId, dayKey)}
 <main class="dashboard">
-  <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}">← Back to visits</a></p>
+  <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to visits</a></p>
   ${renderSessionHead(visit, events.length, renderMetaBlock(visit, registry))}
   ${renderRawDetails(visit)}
   <section>
@@ -197,7 +210,7 @@ export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site 
     ${renderEvents(events, registry)}
   </section>
   <div class="detail-actions">
-    <a class="danger-link" href="/visits/${escapeHtml(visit.id)}/delete">Delete session</a>
+    <a class="danger-link" href="/visits/${escapeHtml(visit.id)}/delete?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">Delete session</a>
   </div>
 </main>`;
   return renderLayout(`Visit ${visit.id}`, body);
@@ -212,20 +225,26 @@ export function renderVisitDetailPage(visit: Visit, events: Event[], site: Site 
 // POST handler then redirects back to the site's session list.
 // ---------------------------------------------------------------------------
 
-export function renderVisitDeletePage(visit: Visit, eventsCount: number, site: Site | null, sites: Site[]): string {
+export function renderVisitDeletePage(
+  visit: Visit,
+  eventsCount: number,
+  site: Site | null,
+  sites: Site[],
+  dayKey?: string,
+): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
   const plural = eventsCount === 1 ? "event" : "events";
-  const body = `${renderTopbar(sites, visit.siteId)}
+  const body = `${renderTopbar(sites, visit.siteId, dayKey)}
 <main class="dashboard">
-  <p class="crumb"><a href="/visits/${escapeHtml(visit.id)}">← Back to session</a></p>
+  <p class="crumb"><a href="/visits/${escapeHtml(visit.id)}?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to session</a></p>
   ${renderSessionHead(visit, eventsCount, renderMetaBlock(visit, registry))}
   <section class="confirm">
     <h2>Delete this session?</h2>
     <p class="muted">The session above and its ${eventsCount} ${plural} will be permanently removed from
       ${escapeHtml(visit.siteId)}. This can't be undone.</p>
     <div class="confirm-actions">
-      <a class="cancel-btn" href="/visits/${escapeHtml(visit.id)}">Cancel</a>
-      <form method="post" action="/visits/${escapeHtml(visit.id)}/delete">
+      <a class="cancel-btn" href="/visits/${escapeHtml(visit.id)}?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">Cancel</a>
+      <form method="post" action="/visits/${escapeHtml(visit.id)}/delete?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">
         <button class="delete-btn" type="submit">Delete session</button>
       </form>
     </div>

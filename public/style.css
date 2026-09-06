@@ -440,26 +440,6 @@ a.chip:hover {
   color: var(--accent);
 }
 
-/* ---------- Pagination ---------- */
-
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.pagination a {
-  color: var(--text);
-  text-decoration: none;
-}
-
-.pagination a:hover {
-  color: var(--accent);
-}
-
 /* ---------- Visit detail ---------- *
  *
  * Compact session head — the same grid + chip grammar as the sessions-list
@@ -720,11 +700,64 @@ button.delete-btn:hover {
   filter: none;
 }
 
+/* ---------- Day navigator (list header) ---------- *
+ *
+ * One Madrid calendar day per page: left/right arrows step a day at a time,
+ * the heading names the day (Today / Yesterday / a date) and, when it isn't
+ * today, doubles as a "back to today" link. Next is disabled on today.
+ */
+
+.daynav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.day-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1;
+  text-decoration: none;
+  user-select: none;
+}
+
+a.day-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.day-btn-off {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.day-heading {
+  min-width: 200px;
+  text-align: center;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.day-heading:hover {
+  color: var(--accent);
+}
+
 /* ---------- Summary strip (numeric cards, no charts) ---------- */
 
 .summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 

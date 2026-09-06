@@ -1,19 +1,20 @@
 import { type Event, type Site, type Visit } from "@prisma/client";
 import { prisma } from "../db";
-import { madridDayBounds } from "./madrid";
 
 // Query layer for the admin pages (routes/home.ts, routes/visit-detail.ts)
 // plus the one admin mutation the UI offers — the per-session delete.
 //
-// The dashboard is deliberately filter-free and chart-free. The summary
-// strip counts the CURRENT MADRID CALENDAR DAY (00:00–23:59, Europe/Madrid)
-// — visits, events, identified emails — plus "Live" (activity in the last
-// few minutes). The visit list below shows every visit for the site,
-// newest-active first, with no app/client/date/email/meta filtering and no
-// top rankings. The one remaining knob is the site switcher in the topbar.
+// The dashboard is deliberately filter-free and chart-free, scoped to ONE
+// Madrid calendar day chosen in the header: the summary strip counts that
+// day (visits / events / identified emails), and the list below it shows
+// every session that had any activity during it, newest-active first — no
+// pagination. "A session was active on the day" means its window overlaps
+// the day (firstAt < day-end AND lastAt ≥ day-start): a session that started
+// yesterday 23:55 and kept firing until 00:05 is on yesterday's list AND
+// today's, which is exactly what "everything that happened that day" wants.
 
-const PAGE_SIZE = 30;
-// "Live" = visits that saw an event in the last 5 minutes.
+// "Live" = visits that saw an event in the last 5 minutes. Only meaningful
+// for the current day — the route computes it solely when day == today.
 const LIVE_WINDOW_MS = 5 * 60_000;
 
 export interface VisitListItem {
@@ -56,18 +57,15 @@ export async function listSites(): Promise<Site[]> {
   return prisma.site.findMany({ orderBy: { id: "asc" } });
 }
 
-/** Every visit for a site, newest-active-first, offset-paginated (30/page),
- *  no filters — every client kind (human/search/ai/bot) is shown. `hasNext`
- *  comes from fetching one row past the page size rather than a COUNT(*).
+/** Every session with activity inside [start, end) for a site (the day chosen
+ *  in the header), newest-active first. No filters, no pagination — the list
+ *  IS the day, and a Madrid day rarely holds more than a few dozen sessions;
+ *  the day bounds keep the scan on the (siteId, lastAt) index.
  *
  *  Each row is enriched with event/page aggregates via a LATERAL join — one
  *  extra lookup per row, kept cheap by the Event `(visitId, at)` index. */
-export async function listVisits(
-  siteId: string,
-  page: number,
-): Promise<{ items: VisitListItem[]; hasNext: boolean }> {
-  const offset = Math.max(0, page - 1) * PAGE_SIZE;
-  const rows = await prisma.$queryRaw<VisitListItem[]>`
+export async function listVisits(siteId: string, start: Date, end: Date): Promise<VisitListItem[]> {
+  return prisma.$queryRaw<VisitListItem[]>`
     SELECT
       v.id, v."siteId", v."firstAt", v."lastAt", v.device, v.os,
       v.country, v.region, v.city, v.lang, v.email, v.theme, v.from, v.ref, v.app,
@@ -83,12 +81,10 @@ export async function listVisits(
       WHERE "visitId" = v.id
     ) e ON true
     WHERE v."siteId" = ${siteId}
+      AND v."firstAt" < ${end}
+      AND v."lastAt" >= ${start}
     ORDER BY v."lastAt" DESC
-    LIMIT ${PAGE_SIZE + 1} OFFSET ${offset}
   `;
-  const hasNext = rows.length > PAGE_SIZE;
-  const items = rows.slice(0, PAGE_SIZE);
-  return { items, hasNext };
 }
 
 export async function getVisitDetail(id: string): Promise<{ visit: Visit; events: Event[] } | null> {
@@ -113,38 +109,47 @@ export async function deleteVisit(id: string): Promise<string | null> {
   return visit.siteId;
 }
 
-/** Site-level numeric summary for the dashboard header. Deliberately NOT
- *  chart data — four scalar counts, deliberately timezone-aware: visits /
- *  events / identified are all counted over the current Madrid calendar day
- *  (00:00–23:59 Europe/Madrid), and live-now is a rolling 5-minute window. */
-export interface SiteSummary {
-  visitsToday: number;
-  eventsToday: number;
-  emailsToday: number;
-  liveNow: number;
+/** Site-level numeric summary for the selected Madrid day. Deliberately NOT
+ *  chart data — three scalar counts over the day the header navigates
+ *  (00:00–23:59 Europe/Madrid): visits (sessions with any activity that day),
+ *  events (rows with `at` inside the day) and distinct identified emails
+ *  among those sessions. "Live" is NOT part of this — it only means something
+ *  for the current day, so the route computes it separately (getLiveNow)
+ *  and the view drops the card for any other day. */
+export interface DaySummary {
+  visits: number;
+  events: number;
+  emails: number;
 }
 
 interface SummaryRow {
-  visitsToday: number;
-  eventsToday: number;
-  emailsToday: number;
-  liveNow: number;
+  visits: number;
+  events: number;
+  emails: number;
 }
 
-export async function getSiteSummary(siteId: string, now: Date): Promise<SiteSummary> {
-  const { start, end } = madridDayBounds(now);
-  const liveSince = new Date(now.getTime() - LIVE_WINDOW_MS);
+export async function getDaySummary(siteId: string, start: Date, end: Date): Promise<DaySummary> {
   const rows = await prisma.$queryRaw<SummaryRow[]>`
     SELECT
       (SELECT count(*)::int FROM "Visit" v
-         WHERE v."siteId" = ${siteId} AND v."firstAt" >= ${start} AND v."firstAt" < ${end}) AS "visitsToday",
+         WHERE v."siteId" = ${siteId}
+           AND v."firstAt" < ${end} AND v."lastAt" >= ${start}) AS visits,
       (SELECT count(*)::int FROM "Event" e JOIN "Visit" v ON v.id = e."visitId"
-         WHERE v."siteId" = ${siteId} AND e.at >= ${start} AND e.at < ${end}) AS "eventsToday",
+         WHERE v."siteId" = ${siteId} AND e.at >= ${start} AND e.at < ${end}) AS events,
       (SELECT count(DISTINCT email)::int FROM "Visit" v
-         WHERE v."siteId" = ${siteId} AND v.email IS NOT NULL
-           AND v."firstAt" >= ${start} AND v."firstAt" < ${end}) AS "emailsToday",
-      (SELECT count(*)::int FROM "Visit" v
-         WHERE v."siteId" = ${siteId} AND v."lastAt" >= ${liveSince}) AS "liveNow"
+         WHERE v."siteId" = ${siteId}
+           AND v."firstAt" < ${end} AND v."lastAt" >= ${start}
+           AND v.email IS NOT NULL) AS emails
   `;
-  return rows[0] ?? { visitsToday: 0, eventsToday: 0, emailsToday: 0, liveNow: 0 };
+  return rows[0] ?? { visits: 0, events: 0, emails: 0 };
+}
+
+/** Count of visits that saw an event in the last 5 minutes ("Live"). */
+export async function getLiveNow(siteId: string, now: Date): Promise<number> {
+  const since = new Date(now.getTime() - LIVE_WINDOW_MS);
+  const rows = await prisma.$queryRaw<{ live: number }[]>`
+    SELECT count(*)::int AS live FROM "Visit" v
+    WHERE v."siteId" = ${siteId} AND v."lastAt" >= ${since}
+  `;
+  return rows[0]?.live ?? 0;
 }

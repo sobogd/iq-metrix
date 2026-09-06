@@ -13,12 +13,14 @@ export function escapeHtml(input: string): string {
  *  selector (options are the site ids — iq-rest, iq-translate, …), then
  *  sign-out — all on one row, even on a phone. The selector is a native
  *  <select> whose options are self-navigating URLs; the inline onchange is
- *  the app's only client JS. */
-export function renderTopbar(sites: Site[], currentSiteId?: string): string {
+ *  the app's only client JS. When a Madrid day is selected in the list
+ *  header (`dayKey`), switching site keeps that day. */
+export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: string): string {
+  const day = dayKey ? `&day=${escapeHtml(dayKey)}` : "";
   const options = sites
     .map(
       (s) =>
-        `<option value="/?site=${escapeHtml(s.id)}"${s.id === currentSiteId ? " selected" : ""}>${escapeHtml(s.id)}</option>`,
+        `<option value="/?site=${escapeHtml(s.id)}${day}"${s.id === currentSiteId ? " selected" : ""}>${escapeHtml(s.id)}</option>`,
     )
     .join("");
   const select =

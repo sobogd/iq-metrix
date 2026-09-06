@@ -184,20 +184,27 @@ site picker listing each site by its id (iq-rest / iq-translate /
 iq-mermaid) and navigating via its one inline `onchange` (each site is its
 own page via `?site=`), and sign-out.
 
-The dashboard is deliberately chart-free, filter-free and ranking-free.
-Above the list, a numeric summary strip shows **today's scorecard** — visits,
-events and distinct identified emails all counted over the current Madrid
-calendar day (00:00–23:59, Europe/Madrid — the same clock the salt rotation
-is anchored to), plus "live" (visits active in the last 5 minutes). The
-cards sit in one row even on a phone, and the labels carry no "today" —
-the day is implicit. No date presets, no filters, no top-page/top-country
-rankings — the page answers "how is today going", and the list below it is
-the raw drill-down.
-Both are computed in `src/lib/visit-queries.ts`; every timestamp in the
+The dashboard is deliberately chart-free, filter-free and ranking-free —
+one **Madrid calendar day per page**, chosen by the date navigator above the
+summary (`?day=YYYY-MM-DD`, default today): `←` / `→` step a day at a time,
+the heading reads **Today** for the current day, **Yesterday** for the
+previous one, otherwise the Madrid date (it doubles as a "back to today"
+link), and the next arrow disables once today is reached. Under that day,
+the numeric summary strip counts **visits** (sessions with any activity
+inside the day — the window overlaps it, so a session that fired on both
+sides of midnight appears on both days' lists), **events** (`at` inside the
+day) and **distinct identified emails** — all over 00:00–23:59 Europe/Madrid
+(the same clock the salt rotation is anchored to) — plus **Live** (visits
+active in the last 5 minutes), shown only when the day is today. The cards
+sit in one row even on a phone; the labels carry no day — the navigator owns
+it. Everything is computed in `src/lib/visit-queries.ts` with the day bounds
+from `src/lib/madrid.ts`; every timestamp in the
 admin (list rows, detail page, events table) renders on a Europe/Madrid
 clock regardless of the server's own timezone (`src/views/format.ts`).
 
-The visit list is one compact row per session, up to three short lines:
+The visit list is the raw drill-down for that day — **every** session that
+was active during it, newest-active first, **no pagination** (the list IS the
+day). One compact row per session, up to three short lines:
 the first shows location — flag + `Country · Region · City` (truncated to a
 single line, full string on hover) — with the event count pinned to the
 right edge. What sits before that count: the referrer whenever the visit
@@ -219,10 +226,10 @@ the list (the window length still lives on the detail page); the third
 appears only for identified sessions and carries the email tag — anonymous
 rows get no identity line at all. No app/landing label is shown. All
 traffic is still stored and listed — human, search-engine, AI-agent
-and other-bot visits alike — with no lens to hide any of it. Pagination is
-plain `<a href>` links, offset-based (30/page), with `hasNext` from
-fetching one row past the page size rather than a `COUNT(*)`. The whole
-row links to the visit detail.
+and other-bot visits alike — with no lens to hide any of it. The whole
+row links to the visit detail, carrying the selected day along
+(`/visits/:id?site=…&day=…`) so "← Back to visits" (and the delete flow)
+returns to the same day.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 The event stream is one chip line per event whose first pill shows the page:
