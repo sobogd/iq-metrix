@@ -244,17 +244,20 @@ row links to the visit detail, carrying the selected day along
 returns to the same day.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
-Its top row carries the back-crumb and, right next to it, the danger-outlined
-"Delete session" link — near the session's main info, not at the bottom of
-the page. The head keeps the chip grammar (location, activity window, chips,
-email). Below it, every event is a card in exactly the sessions-list layout
+Its top tools row holds two icon buttons: ⬅️ back to the visits list (keeping
+the selected day) and, on the right, 🗑️ delete. Everything known about the
+session lives in one collapsed **"Session info"** expander — one field per
+row (country/region/city, first/last seen, events, app, OS, language, theme,
+referrer/from, email, client as the combined kind+reason line, duration,
+merge count, ids/hashes, meta snapshot) — so the page reads: tools, the
+disclosure, then the event list as the main content. Below it, every event
+is a card in exactly the sessions-list layout
 (flat text at 14px, chip colors only, no pills), **newest first**: the head
 line carries the event name with the action verb in its funnel color, the
 page pathname (`/`, `/ru/feature-slug`) sits under it in purple when the
 event recorded one, and a dot-separated meta line holds HH:MM:SS · locale ·
 app · the per-event meta values (keys with a `{v}` link template stay links
-to the source product's own admin). The delete link GETs to a JS-free
-confirm
+to the source product's own admin). The 🗑️ link GETs to a JS-free confirm
 page (the same session head re-rendered, so you see exactly what goes); only
 the confirm page's POST actually deletes the visit and its events and
 redirects back to the site's session list.

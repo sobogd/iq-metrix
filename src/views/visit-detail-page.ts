@@ -13,7 +13,7 @@ import {
   fmtVisitRange,
   renderMetaChips,
 } from "./format";
-import { chip, clientChip, deviceChip, flat, osChip, sourceChip, themeChip } from "./tags";
+import { chip, clientChip, clientKindLabel, deviceChip, flat, osChip, sourceChip, themeChip } from "./tags";
 
 // Separate page (GET /visits/:id), not a <dialog> opened from the list row.
 // Picked over a dialog because this app deliberately has no client JS
@@ -39,17 +39,6 @@ export function renderVisitNotFoundPage(sites: Site[], dayKey?: string, refreshH
     <p><a href="${back}">← Back to visits</a></p>
   </main>`;
   return renderLayout("Not found", body);
-}
-
-function kv(label: string, value: string): string {
-  return `<div class="kv"><span class="k">${escapeHtml(label)}</span><span class="v">${value}</span></div>`;
-}
-
-/** <code> that truncates with an ellipsis but keeps the full value in a
- *  tooltip — long hex ids would otherwise blow the row width. */
-function kvCode(label: string, value: string, keep = 24): string {
-  const shown = value.length > keep ? `${value.slice(0, keep)}…` : value;
-  return kv(label, `<code title="${escapeHtml(value)}">${escapeHtml(shown)}</code>`);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,25 +85,6 @@ function renderSessionHead(visit: Visit, eventsCount: number, metaBlock: string)
     ${idHtml}
     ${metaBlock}
   </section>`;
-}
-
-/** Collapsed "everything else" — verbose rows that would only add noise to
- *  the compact head: exact timestamps, attribution raw values, the bot
- *  verdict, and the internal visit/key/hash identifiers. */
-function renderRawDetails(visit: Visit): string {
-  const fields = [
-    kv("First seen", fmtDateTime(visit.firstAt)),
-    kv("Last seen", fmtDateTime(visit.lastAt)),
-    kv("From", escapeHtml(visit.from ?? "—")),
-    kv("Referrer", escapeHtml(visit.ref ?? "—")),
-    kv("Client kind", escapeHtml(visit.client ?? "—")),
-    visit.clientReason ? kv("Client reason", escapeHtml(visit.clientReason)) : "",
-    kv("Merged anonymous visits", String(visit.mergeCount)),
-    kv("Visit id", `<code>${escapeHtml(visit.id)}</code>`),
-    kvCode("Visit key", visit.visitKey),
-    kvCode("Device hash", visit.hash),
-  ].join("");
-  return `<details class="raw"><summary>Session ids &amp; exact timestamps</summary><div class="kv-grid">${fields}</div></details>`;
 }
 
 /** Latest meta snapshot block for the session head — shared by the detail
@@ -196,6 +166,61 @@ function renderEvent(e: Event, registry: ReturnType<typeof asMetaKeysRegistry>):
   </div>`;
 }
 
+/** One kv row — label left, value right, full width (the expander lists one
+ *  field per row). `value` is trusted HTML (escaping done by callers). */
+function kvRow(label: string, value: string): string {
+  return `<div class="kv"><span class="k">${escapeHtml(label)}</span><span class="v">${value}</span></div>`;
+}
+
+/** The whole session's information as one collapsed expander — one field per
+ *  row, so the page reads: back/delete icons, the "Session info" disclosure,
+ *  then the events list as the main content. */
+function renderSessionInfo(
+  visit: Visit,
+  eventsCount: number,
+  registry: ReturnType<typeof asMetaKeysRegistry>,
+): string {
+  const rows: string[] = [];
+
+  const location: string[] = [];
+  location.push(kvRow("Country", `${countryEmoji(visit.country)} ${escapeHtml(countryName(visit.country))}`));
+  if (visit.region) location.push(kvRow("Region", escapeHtml(visit.region)));
+  if (visit.city) location.push(kvRow("City", escapeHtml(visit.city)));
+
+  rows.push(...location);
+  rows.push(kvRow("First seen", escapeHtml(fmtDateTime(visit.firstAt))));
+  rows.push(kvRow("Last seen", escapeHtml(fmtDateTime(visit.lastAt))));
+  rows.push(kvRow("Events", String(eventsCount)));
+  if (visit.app) rows.push(kvRow("App", escapeHtml(visit.app)));
+  if (visit.os) rows.push(kvRow("OS", escapeHtml(visit.os)));
+  if (visit.device === "tablet") rows.push(kvRow("Device", "Tablet"));
+  if (visit.lang) rows.push(kvRow("Language", escapeHtml(visit.lang)));
+  if (visit.theme) {
+    const theme = visit.theme === "dark" ? "🌙 dark" : visit.theme === "light" ? "☀️ light" : visit.theme;
+    rows.push(kvRow("Theme", escapeHtml(theme)));
+  }
+  if (visit.ref) rows.push(kvRow("Referrer", escapeHtml(visit.ref)));
+  if (visit.from) rows.push(kvRow("From", escapeHtml(visit.from)));
+  if (visit.email) rows.push(kvRow("Email", escapeHtml(visit.email)));
+  rows.push(kvRow("Client", escapeHtml(clientKindLabel(visit.client, visit.clientReason) || "Human")));
+  rows.push(kvRow("Duration", escapeHtml(fmtDuration(visit.firstAt, visit.lastAt))));
+  if (visit.mergeCount > 0) rows.push(kvRow("Merged anonymous visits", String(visit.mergeCount)));
+  rows.push(kvRow("Visit id", `<code>${escapeHtml(visit.id)}</code>`));
+  rows.push(kvRow("Visit key", `<code>${escapeHtml(visit.visitKey)}</code>`));
+  rows.push(kvRow("Device hash", `<code>${escapeHtml(visit.hash)}</code>`));
+
+  const meta = coerceMeta(visit.meta);
+  const metaRow =
+    Object.keys(meta).length > 0
+      ? `<div class="meta-block"><span class="k">Meta snapshot</span><div>${renderMetaChips(meta, registry)}</div></div>`
+      : "";
+
+  return `<details class="raw session-info"><summary>Session info</summary>
+  <div class="kv-col">${rows.join("")}</div>
+  ${metaRow}
+</details>`;
+}
+
 function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysRegistry>): string {
   if (events.length === 0) return `<p class="muted">No events recorded.</p>`;
   const rows: string[] = [];
@@ -225,12 +250,11 @@ export function renderVisitDetailPage(
 
   const body = `${renderTopbar(sites, visit.siteId, dayKey, refreshHref)}
 <main class="dashboard">
-  <div class="crumb-row">
-    <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to visits</a></p>
-    <a class="danger-link" href="/visits/${escapeHtml(visit.id)}/delete?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">Delete session</a>
+  <div class="detail-tools">
+    <a class="icon-btn" href="/?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}" title="Back to visits" aria-label="Back to visits">⬅️</a>
+    <a class="icon-btn icon-btn-danger" href="/visits/${escapeHtml(visit.id)}/delete?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}" title="Delete session" aria-label="Delete session">🗑️</a>
   </div>
-  ${renderSessionHead(visit, events.length, renderMetaBlock(visit, registry))}
-  ${renderRawDetails(visit)}
+  ${renderSessionInfo(visit, events.length, registry)}
   <section>
     <h2>Events (${events.length})</h2>
     ${renderEvents(events, registry)}

@@ -619,13 +619,25 @@ a.chip:hover {
   font-size: 13px;
 }
 
-/* The back-crumb row on the visit detail — the delete link sits here, at the
-   top near the session's main info, not at the bottom of the page. */
-.crumb-row {
+/* The visit detail's top tools row — back on the left, delete on the right,
+   both as icon buttons (same .icon-btn style as the topbar). */
+.detail-tools {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.icon-btn-danger {
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.45);
+}
+
+a.icon-btn-danger:hover,
+button.icon-btn-danger:hover {
+  background: rgba(255, 107, 107, 0.12);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .session-head {
@@ -742,12 +754,6 @@ details.raw[open] summary {
   background: var(--border);
 }
 
-.kv-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px 20px;
-}
-
 .kv {
   display: flex;
   justify-content: space-between;
@@ -759,10 +765,21 @@ details.raw[open] summary {
 
 .kv .k {
   color: var(--muted);
+  flex: 0 0 auto;
 }
 
 .kv .v {
   text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* "Session info" expander on the visit detail — the whole session as one
+   field per row, stacked. */
+.kv-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
 }
 
 .meta-block {
@@ -781,28 +798,12 @@ details.raw[open] summary {
 
 /* ---------- Session delete (confirm page) ---------- *
  *
- * The visit detail now carries its danger-outlined "Delete session" link in
- * the top crumb row; the link only GETs to the confirm page (no state
- * change). There the session head is re-rendered and a danger POST button
- * is the one control that actually deletes — cancel is a plain link back.
- * Same red accent as .tag-bot/error, so destructive controls read danger at
- * a glance.
+ * The visit detail's delete control is the 🗑️ icon button in its top tools
+ * row; it only GETs to the confirm page (no state change). There the session
+ * head is re-rendered and a danger POST button is the one control that
+ * actually deletes — cancel is a plain link back. Same red accent as
+ * .tag-bot/error, so destructive controls read danger at a glance.
  */
-
-a.danger-link {
-  display: inline-block;
-  text-decoration: none;
-  color: var(--danger);
-  font-weight: 600;
-  border: 1px solid rgba(255, 107, 107, 0.4);
-  border-radius: 8px;
-  padding: 8px 12px;
-}
-
-a.danger-link:hover {
-  background: rgba(255, 107, 107, 0.1);
-  border-color: var(--danger);
-}
 
 .confirm {
   display: flex;
