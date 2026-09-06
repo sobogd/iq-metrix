@@ -19,10 +19,7 @@ export interface VisitListPageData {
   todayKey: string;
   /** Next arrow is disabled once the selected day IS today — no future days. */
   canNext: boolean;
-  /** Live card only means something for the current day. */
-  isToday: boolean;
   summary: DaySummary;
-  live: number;
   /** Current request URL — the topbar's refresh icon links here to reload. */
   refreshHref: string;
 }
@@ -59,20 +56,19 @@ function renderDayNav(data: Pick<VisitListPageData, "currentSite" | "dayKey" | "
   </nav>`;
 }
 
-/** Scalar stat cards for the selected day — Visits / Events / Identified,
- *  plus "Live" only when the day is the current one (it is a now-measure).
- *  Cards sit in one row even on a phone; the grid column count follows the
- *  card count (3 or 4) so dropping Live on a past day leaves no empty cell. */
-function renderSummary(s: DaySummary, live: number, isToday: boolean): string {
-  const cards: Array<{ label: string; value: string; live?: boolean }> = [
+/** Scalar stat cards for the selected day — Visits / Events / Identified.
+ *  There is deliberately no live number: liveness is per-row, shown as the
+ *  green border on sessions that fired in the last ~30 minutes. Cards sit in
+ *  one row even on a phone. */
+function renderSummary(s: DaySummary): string {
+  const cards: Array<{ label: string; value: string }> = [
     { label: "Visits", value: String(s.visits) },
     { label: "Events", value: String(s.events) },
     { label: "Identified", value: String(s.emails) },
   ];
-  if (isToday) cards.push({ label: "Live", value: String(live), live: true });
-  return `<section class="summary" style="grid-template-columns: repeat(${cards.length}, 1fr)">${cards
+  return `<section class="summary">${cards
     .map(
-      (c) => `<div class="stat${c.live ? " stat-live" : ""}">
+      (c) => `<div class="stat">
         <span class="stat-value">${escapeHtml(c.value)}</span>
         <span class="stat-label">${escapeHtml(c.label)}</span>
       </div>`,
@@ -97,6 +93,8 @@ function renderSummary(s: DaySummary, live: number, isToday: boolean): string {
 //           shrink & ellipsize before wrapping; time and count never shrink.
 //   line 4: the email chip — only when the visit is identified; anonymous
 //           sessions get no identity line at all.
+// A session that fired an event in the last ~30 minutes is STILL LIVE and its
+// whole row gets a green border instead of the usual one.
 // The whole row links to the visit detail, carrying the day back so
 // "← Back to visits" returns to the same day.
 // ---------------------------------------------------------------------------
@@ -145,7 +143,7 @@ function renderRow(item: VisitListItem, dayKey: string): string {
     : "";
 
   return `
-  <a class="visit-row" href="/visits/${escapeHtml(item.id)}?site=${escapeHtml(item.siteId)}&day=${escapeHtml(dayKey)}">
+  <a class="visit-row${item.live ? " visit-row-live" : ""}" href="/visits/${escapeHtml(item.id)}?site=${escapeHtml(item.siteId)}&day=${escapeHtml(dayKey)}">
     ${geoRow}
     ${entryRow}
     ${chipsHtml}
@@ -162,7 +160,7 @@ export function renderVisitListPage(data: VisitListPageData): string {
   const body = `${renderTopbar(data.sites, data.currentSite.id, data.dayKey, data.refreshHref)}
 <main class="dashboard">
   ${renderDayNav(data)}
-  ${renderSummary(data.summary, data.live, data.isToday)}
+  ${renderSummary(data.summary)}
   ${renderTable(data.items, data.dayKey)}
 </main>`;
   return renderLayout("Visits", body);

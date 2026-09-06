@@ -13,9 +13,11 @@ import { prisma } from "../db";
 // yesterday 23:55 and kept firing until 00:05 is on yesterday's list AND
 // today's, which is exactly what "everything that happened that day" wants.
 
-// "Live" = visits that saw an event in the last 5 minutes. Only meaningful
-// for the current day — the route computes it solely when day == today.
-const LIVE_WINDOW_MS = 5 * 60_000;
+// "Live" is a row-level flag now, not a summary metric: a session whose last
+// event sits inside this window is still ongoing (the same 30 minutes the
+// visit-resolver uses as its idle cutoff), and the sessions list highlights
+// it with a green border. Past-day views simply never have such rows.
+const LIVE_RECENT_MS = 30 * 60_000;
 
 export interface VisitListItem {
   id: string;
@@ -51,6 +53,9 @@ export interface VisitListItem {
   firstPage: string | null;
   /** Last page of the visit, in the same path ?? label form. */
   lastPage: string | null;
+  /** True when the session saw an event within the last ~30 minutes — it is
+   *  still "live" and the list highlights the row with a green border. */
+  live: boolean;
 }
 
 export async function listSites(): Promise<Site[]> {
@@ -64,13 +69,15 @@ export async function listSites(): Promise<Site[]> {
  *
  *  Each row is enriched with event/page aggregates via a LATERAL join — one
  *  extra lookup per row, kept cheap by the Event `(visitId, at)` index. */
-export async function listVisits(siteId: string, start: Date, end: Date): Promise<VisitListItem[]> {
+export async function listVisits(siteId: string, start: Date, end: Date, now: Date): Promise<VisitListItem[]> {
+  const liveSince = new Date(now.getTime() - LIVE_RECENT_MS);
   return prisma.$queryRaw<VisitListItem[]>`
     SELECT
       v.id, v."siteId", v."firstAt", v."lastAt", v.device, v.os,
       v.country, v.region, v.city, v.lang, v.email, v.theme, v.from, v.ref, v.app,
       v."client", v."clientReason", v."meta", v."mergeCount",
-      e."eventCount", e."pageCount", e."firstPage", e."lastPage"
+      e."eventCount", e."pageCount", e."firstPage", e."lastPage",
+      v."lastAt" >= ${liveSince} AS live
     FROM "Visit" v
     LEFT JOIN LATERAL (
       SELECT count(*)::int AS "eventCount",
@@ -113,9 +120,8 @@ export async function deleteVisit(id: string): Promise<string | null> {
  *  chart data — three scalar counts over the day the header navigates
  *  (00:00–23:59 Europe/Madrid): visits (sessions with any activity that day),
  *  events (rows with `at` inside the day) and distinct identified emails
- *  among those sessions. "Live" is NOT part of this — it only means something
- *  for the current day, so the route computes it separately (getLiveNow)
- *  and the view drops the card for any other day. */
+ *  among those sessions. There is no "live" number — liveness is per-row, on
+ *  the sessions list (VisitListItem.live). */
 export interface DaySummary {
   visits: number;
   events: number;
@@ -142,14 +148,4 @@ export async function getDaySummary(siteId: string, start: Date, end: Date): Pro
            AND v.email IS NOT NULL) AS emails
   `;
   return rows[0] ?? { visits: 0, events: 0, emails: 0 };
-}
-
-/** Count of visits that saw an event in the last 5 minutes ("Live"). */
-export async function getLiveNow(siteId: string, now: Date): Promise<number> {
-  const since = new Date(now.getTime() - LIVE_WINDOW_MS);
-  const rows = await prisma.$queryRaw<{ live: number }[]>`
-    SELECT count(*)::int AS live FROM "Visit" v
-    WHERE v."siteId" = ${siteId} AND v."lastAt" >= ${since}
-  `;
-  return rows[0]?.live ?? 0;
 }

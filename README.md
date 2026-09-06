@@ -196,8 +196,8 @@ the numeric summary strip counts **visits** (sessions with any activity
 inside the day — the window overlaps it, so a session that fired on both
 sides of midnight appears on both days' lists), **events** (`at` inside the
 day) and **distinct identified emails** — all over 00:00–23:59 Europe/Madrid
-(the same clock the salt rotation is anchored to) — plus **Live** (visits
-active in the last 5 minutes), shown only when the day is today. The cards
+(the same clock the salt rotation is anchored to). There is no live number
+in the strip — liveness is per-row (see below). The cards
 sit in one row even on a phone; the labels carry no day — the navigator owns
 it. Everything is computed in `src/lib/visit-queries.ts` with the day bounds
 from `src/lib/madrid.ts`; every timestamp in the
@@ -223,7 +223,10 @@ came from a tablet, theme and language — time and the count never shrink;
 the fourth line appears only for identified sessions and carries the email
 tag — anonymous rows get no identity line at all. No app/landing label is
 shown, no duration pill (the window length still lives on the detail page).
-All traffic is still stored and listed — human, search-engine, AI-agent
+A session whose last event falls within the last ~30 minutes is still live
+and its whole row is highlighted with a green border — the modern stand-in
+for the removed "Live" counter. All
+traffic is still stored and listed — human, search-engine, AI-agent
 and other-bot visits alike — with no lens to hide any of it. The whole
 row links to the visit detail, carrying the selected day along
 (`/visits/:id?site=…&day=…`) so "← Back to visits" (and the delete flow)

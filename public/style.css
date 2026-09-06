@@ -294,6 +294,15 @@ code {
   border-color: var(--accent);
 }
 
+/* A session that fired an event in the last ~30 minutes is still live — its
+   whole row carries a green border (and a soft outer ring) so it reads as
+   "someone is on the site right now" while scanning the list. */
+.visit-row-live,
+.visit-row-live:hover {
+  border-color: rgba(126, 224, 195, 0.7);
+  box-shadow: 0 0 0 1px rgba(126, 224, 195, 0.22);
+}
+
 /* Row 1 — geography chips. Each chip is at least 20% of the line wide and
    grows to share it; text too long for the share ellipsizes. */
 .r-geo {
@@ -850,10 +859,11 @@ a.day-heading:hover {
 
 .summary {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
-/* Keep the four cards side by side on phones too — tighter cards below. */
+/* Keep the three cards side by side on phones too — tighter cards below. */
 @media (max-width: 480px) {
   .summary {
     gap: 6px;
@@ -892,10 +902,6 @@ a.day-heading:hover {
 .stat-label {
   font-size: 12px;
   color: var(--muted);
-}
-
-.stat-live .stat-value {
-  color: var(--accent-2);
 }
 
 /* ---------- Mobile touch targets ---------- */

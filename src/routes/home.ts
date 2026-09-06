@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
-import { getDaySummary, getLiveNow, listSites, listVisits } from "../lib/visit-queries";
+import { getDaySummary, listSites, listVisits } from "../lib/visit-queries";
 import { madridBoundsFromKey, madridDayKey, shiftMadridDay } from "../lib/madrid";
 import { fmtDayHeading } from "../views/format";
 import { renderNoSitesPage, renderVisitListPage } from "../views/visit-list-page";
@@ -11,10 +11,12 @@ function str(v: unknown): string {
 
 /** GET / — one Madrid calendar day, chosen in the header's date navigator
  *  (?day=YYYY-MM-DD, default today): the summary strip counts that day
- *  (Visits/Events/Identified, plus Live when the day is today), and the list
- *  below is every session that had activity during it — no pagination, the
- *  list IS the day. The only query knobs left are the topbar site switch
- *  (which keeps the day) and the arrows/heading of the navigator. */
+ *  (Visits/Events/Identified — there is no live number), and the list below
+ *  it is every session that had activity during it — no pagination, the
+ *  list IS the day, and sessions with an event in the last ~30 minutes are
+ *  highlighted as live with a green border. The only query knobs left are
+ *  the topbar site switch (which keeps the day) and the arrows/heading of
+ *  the navigator. */
 export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get("/", async (request, reply) => {
     const user = requireAdmin(request, reply);
@@ -35,13 +37,10 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
     const rawDay = str(q.day);
     const dayKey = (rawDay && madridBoundsFromKey(rawDay) ? rawDay : todayKey) as string;
     const { start, end } = madridBoundsFromKey(dayKey)!;
-    const isToday = dayKey === todayKey;
 
-    const [items, summary, live] = await Promise.all([
-      listVisits(currentSite.id, start, end),
+    const [items, summary] = await Promise.all([
+      listVisits(currentSite.id, start, end, now),
       getDaySummary(currentSite.id, start, end),
-      // Live is a now-measure — only asked for when it will be shown.
-      isToday ? getLiveNow(currentSite.id, now) : Promise.resolve(0),
     ]);
 
     return reply.send(
@@ -55,9 +54,7 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
         nextKey: shiftMadridDay(dayKey, 1),
         todayKey,
         canNext: dayKey < todayKey,
-        isToday,
         summary,
-        live,
         refreshHref: request.url,
       }),
     );
