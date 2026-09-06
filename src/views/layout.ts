@@ -23,11 +23,12 @@ function tbButton(face: string, label: string, controlBody: string): string {
     </span>`;
 }
 
-/** Shared page header — left: logo + the selected company's id in bold
- *  (truncating); right: a row of borderless emoji buttons — refresh,
- *  calendar (native date picker), company (native select), sign-out (with a
- *  native confirm). The selected Madrid day (`dayKey`) is kept when changing
- *  company or picking a date. */
+/** Shared page header — left: the logo emoji + selected company's id in bold
+ *  (truncating); clicking the logo or the id opens the NATIVE company select
+ *  (the <select> is laid invisibly over the whole left block). Right: a row
+ *  of borderless emoji buttons — refresh, calendar (native date picker),
+ *  sign-out (with a native confirm). The selected Madrid day (`dayKey`) is
+ *  kept when changing company or picking a date. */
 export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: string, refreshHref = "/"): string {
   const siteId = currentSiteId ?? sites[0]?.id ?? "";
   const day = (dayKey ?? madridDayKey(new Date())) as string;
@@ -47,26 +48,27 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
         `<option value="${escapeHtml(`/?site=${s.id}&day=${day}`)}"${s.id === siteId ? " selected" : ""}>${escapeHtml(s.id)}</option>`,
     )
     .join("");
+
+  // Logo + id block: the native company <select> sits invisibly over it, so
+  // clicking the emoji or the bold id opens the picker.
   const company =
     sites.length > 0
-      ? tbButton(
-          "🏢",
-          "Pick a company",
-          `<select class="tb-ghost" aria-label="Pick a company" onchange="location.href=this.value">${options}</select>`,
-        )
-      : "";
+      ? `<span class="tb-company" title="Pick a company">
+  <select class="tb-ghost" aria-label="Pick a company" onchange="location.href=this.value">${options}</select>
+  <span class="logo">📊</span>
+  <span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>
+</span>`
+      : `<span class="logo">📊</span>`;
 
   const logout = `<form method="post" action="/logout" onsubmit="return confirm('Sign out?')"><button type="submit" class="tb-ico" title="Sign out" aria-label="Sign out"><span class="tb-face" aria-hidden="true">🚪</span></button></form>`;
 
   return `
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="logo" href="/" aria-label="iq-metrix">📊</a>
-    ${siteId ? `<span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>` : ""}
+    ${company}
     <div class="topbar-actions">
-      ${refresh}
       ${calendar}
-      ${company}
+      ${refresh}
       ${logout}
     </div>
   </div>
