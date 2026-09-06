@@ -42,7 +42,7 @@ ecosystem.config.js              pm2 process definition
 | `Site` | One row per source product (`iq-rest`, `iq-translate`, `iq-mermaid`). Holds `domain` and the registry of allowed `meta` keys (`metaKeys`). |
 | `AnalyticsSalt` | Singleton-per-site (`id = "current"`) holding the active hash salt. Rotated daily at 04:00 Europe/Madrid. |
 | `Visit` | One row = one **visit**: a device hash plus an identity, cut after 30 minutes of silence. Multi-tenant (`siteId`). |
-| `Event` | Minimal event rows (page/action/name triple); device/geo/source live on the visit. |
+| `Event` | Minimal event rows (page/action/name triple + optional concrete `path`); device/geo/source live on the visit. |
 
 Key design decisions (vs. the two reference pipelines this was ported from):
 
@@ -74,7 +74,11 @@ The relay path. Auth is the `X-Ingest-Key` header (a constant shared secret per
 deployment), not a session — this is a server-to-server call from a relay inside
 a source product, never a browser. Body: `site`, `ip`, `ua`, optional
 `headers`/`email`/`app`/`meta`/`tok`, and an `events` array (≤ 50, each a
-`page`/`action`/`name` triple with optional `locale`/`meta`/`at`). Returns
+`page`/`action`/`name` triple with optional `path`/`locale`/`meta`/`at`). `path`
+is the concrete pathname of the page the event happened on (`/`, `/ru`,
+`/ru/feature-slug`) — the coarse `page` label stays the type, `path` is the real
+URL; browser clients have stamped it since Sep 2026, server-fired events may
+omit it. Returns
 `{ tok }` — a fresh visit-continuation token.
 
 Attribution (`from`/`ref`/`theme`) arrives as **reserved keys inside `meta`**
@@ -203,26 +207,32 @@ hover; only with no referrer does the type tag show — a `search` verdict
 gets a red `search crawler` pill (the engine's own crawler fetching the
 page), `ai`/`preview`/`bot` their plain red pill, humans nothing. The
 second line is a row of colored text tags (no emoji) that opens with the
-last-activity time, then OS (Windows/macOS/iOS/Android — the device form
-factor is implied), a `Tablet` chip only when the visit really came from a
-tablet (a tablet keeps the same OS name, so that one case is worth calling
-out), the `from <campaign>` tag when one exists (`via <referrer>` is never
-repeated here — line 1 owns it), light/dark theme and language — the old
-session-duration pill is gone from the list (the window length still lives
-on the detail page); the third appears only for
-identified sessions and carries the email tag — anonymous rows get no
-identity line at all. No app/landing label and no entry page are shown.
-All traffic is still stored and listed — human, search-engine, AI-agent
+last-activity time, then the **entry page** — where the session opened,
+shown as its concrete pathname (`/`, `/ru/feature-slug`; the coarse page
+label for sessions recorded before path capture) — then OS
+(Windows/macOS/iOS/Android — the device form factor is implied), a `Tablet`
+chip only when the visit really came from a tablet (a tablet keeps the same
+OS name, so that one case is worth calling out), the `from <campaign>` tag
+when one exists (`via <referrer>` is never repeated here — line 1 owns it),
+light/dark theme and language — the old session-duration pill is gone from
+the list (the window length still lives on the detail page); the third
+appears only for identified sessions and carries the email tag — anonymous
+rows get no identity line at all. No app/landing label is shown. All
+traffic is still stored and listed — human, search-engine, AI-agent
 and other-bot visits alike — with no lens to hide any of it. Pagination is
 plain `<a href>` links, offset-based (30/page), with `hasNext` from
 fetching one row past the page size rather than a `COUNT(*)`. The whole
 row links to the visit detail.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
-Meta chips are rendered generically from the current site's `Site.metaKeys`
-registry; a key with a `{v}` link template renders as an external link to the
-source product's own admin, everything else as plain text. A danger-outlined
-"Delete session" link at the bottom of the page leads to a JS-free confirm
+The event stream is one chip line per event whose first pill shows the page:
+the concrete pathname when the event carries one (`/`, `/ru/feature-slug` —
+hover for the coarse `page` label it replaced), the label itself for events
+recorded before path capture. Meta chips are rendered generically from the
+current site's `Site.metaKeys` registry; a key with a `{v}` link template
+renders as an external link to the source product's own admin, everything else
+as plain text. A danger-outlined "Delete session" link at the bottom of the
+page leads to a JS-free confirm
 page (the same session head re-rendered, so you see exactly what goes); only
 the confirm page's POST actually deletes the visit and its events and
 redirects back to the site's session list.
@@ -243,7 +253,10 @@ The browser clients live in the consumer repos, not here:
 `translator/lib/analytics/ingest.ts` (forward-with-timeout + on-disk spool, so a
 transient outage never loses an event). dashboard-api's own analytics-v2 relay
 was removed — its `src/analytics-v2` directory is empty; the iq-rest browser apps
-now hit `/e` directly.
+now hit `/e` directly. The landing / translator / mermaid clients stamp each
+event with the page's pathname (`path`) as of the Sep 2026 path-capture change;
+the dashboard-web client predates it and sends none (its events all report the
+single `Dashboard` page anyway).
 
 ## Production / infra
 

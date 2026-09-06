@@ -1,7 +1,7 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { countryEmoji, countryName, fmtShortDateTime } from "./format";
-import { chip, clientChip, deviceChip, osChip, searchCrawlerChip, sourceChip, themeChip } from "./tags";
+import { chip, clientChip, deviceChip, entryChip, osChip, searchCrawlerChip, sourceChip, themeChip } from "./tags";
 import type { SiteSummary, VisitListItem } from "../lib/visit-queries";
 
 export interface VisitListPageData {
@@ -43,7 +43,7 @@ function renderSummary(s: SiteSummary): string {
 }
 
 // ---------------------------------------------------------------------------
-// Compact visit rows — three short lines per session:
+// Compact visit rows — up to three short lines per session:
 //   line 1: flag + country · region · city ......... referrer/type pill + evts
 //           (the location truncates to one line — full string in the title;
 //           a real referrer REPLACES the type tag: green "via <referrer>"
@@ -51,15 +51,18 @@ function renderSummary(s: SiteSummary): string {
 //           tag show — "search" verdicts get a red "search crawler" pill
 //           (the engine's own crawler), ai/preview/bot their plain red pill,
 //           humans nothing)
-//   line 2: colored TEXT tags (no emoji) — the last-activity time FIRST,
-//          then OS, "Tablet" only when it really is one, the "from" source,
-//          theme, lang. "via <referrer>" never repeats here — line 1 owns it.
-//          The session-duration pill is gone from the list; long referrer /
-//          geo text truncates instead of spreading the row.
+//   line 2: colored TEXT tags (no emoji) — the last-activity time FIRST
+//           (the recency anchor), then the ENTRY PAGE — where the session
+//           opened, its concrete path ("/", "/ru/feature-slug"; the coarse
+//           page label for pre-path sessions) — then OS, "Tablet" only when
+//           it really is one, the "from" source, theme, lang. "via
+//           <referrer>" never repeats here — line 1 owns it. The
+//           session-duration pill is gone from the list; long referrer / geo
+//           text truncates instead of spreading the row.
 //   line 3: the email tag — only when the visit is identified; anonymous
-//          sessions get no line at all.
-// No app/landing label and no entry page — both only confused the list.
-// The whole row links to the visit detail.
+//           sessions get no line at all.
+// No app/landing label — it only confused the list. The whole row links to
+// the visit detail.
 // ---------------------------------------------------------------------------
 
 function renderRow(item: VisitListItem): string {
@@ -74,6 +77,10 @@ function renderRow(item: VisitListItem): string {
 
   const tags: string[] = [];
   tags.push(chip("tag-muted", fmtShortDateTime(item.lastAt))); // activity time first
+  // The entry page — where the session opened — sits right after the time
+  // anchor so "what did this visit look like" reads top-down: when they came
+  // in, on what page.
+  if (item.firstPage) tags.push(entryChip(item.firstPage));
   tags.push(osChip(item.os));
   tags.push(deviceChip(item.device));
   // "via <ref>" lives on line 1 when a referrer exists — never repeat it in

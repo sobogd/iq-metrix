@@ -7,7 +7,7 @@ import { getSalt } from "../lib/salt";
 import { applyAttribution, applyIngestSnapshot, continueVisit, resolveVisit } from "../lib/visit";
 import { signVisitToken, verifyVisitToken } from "../lib/visit-token";
 import { classifyRequest, isScriptUa } from "../lib/client-kind";
-import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX } from "../lib/labels";
+import { APP_REGEX, LABEL_REGEX, LOCALE_REGEX, NAME_REGEX, PATH_REGEX } from "../lib/labels";
 import {
   type Attribution,
   allowedMetaKeys,
@@ -65,6 +65,7 @@ interface RawEventBody {
   page?: unknown;
   action?: unknown;
   name?: unknown;
+  path?: unknown;
   locale?: unknown;
   meta?: unknown;
   at?: unknown;
@@ -82,6 +83,9 @@ interface ParsedEvent {
   page: string;
   action: string;
   name: string;
+  /** Concrete pathname of the page the event happened on, or null when the
+   *  sender did not provide one (legacy clients, server-fired events). */
+  path: string | null;
   locale: string | null;
   meta: Record<string, string>;
   attribution: Attribution;
@@ -119,11 +123,13 @@ function parseEvent(raw: unknown, allowed: ReadonlySet<string>, now: Date): Pars
   if (!page || !action || !name) return null;
   const localeRaw = typeof r.locale === "string" ? r.locale : typeof r.loc === "string" ? r.loc : null;
   const locale = localeRaw && LOCALE_REGEX.test(localeRaw) ? localeRaw.toLowerCase() : null;
+  const path = typeof r.path === "string" && PATH_REGEX.test(r.path) ? r.path : null;
   const atRaw = r.at ?? r.ts;
   return {
     page,
     action,
     name,
+    path,
     locale,
     meta: sanitizeMeta(r.meta, allowed),
     attribution: extractAttribution(r.meta),
@@ -206,6 +212,7 @@ export async function publicIngestRoutes(fastify: FastifyInstance): Promise<void
         page: e.page,
         action: e.action,
         name: e.name,
+        path: e.path,
         locale: e.locale,
         app,
         meta: e.meta,

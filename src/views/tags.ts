@@ -70,3 +70,21 @@ export function searchCrawlerChip(reason: string | null): string {
   const title = reason ? ` title="${escapeHtml(reason)}"` : "";
   return `<span class="tag tag-bot"${title}>search crawler</span>`;
 }
+
+/** One "which page" pill — the purple tag the detail event stream uses for
+ *  the page an event happened on. Shows the CONCRETE pathname ("/",
+ *  "/ru/feature-slug") once the client recorded one, falling back to the
+ *  coarse `page` label for events ingested before path capture. Long paths
+ *  ellipsize via .tag's CSS; the tooltip carries the full path and, when a
+ *  path is shown, the label it replaced. */
+export function pageChip(path: string | null, label: string): string {
+  const shown = path ?? label;
+  const title = path ? `${label} · ${path}` : label;
+  return `<span class="tag tag-page" title="${escapeHtml(title)}">${escapeHtml(shown)}</span>`;
+}
+
+/** Entry-page pill for a sessions-list row — the visit's first page, already
+ *  reduced to "path ?? label" by the list query (visit-queries.ts). */
+export function entryChip(page: string): string {
+  return `<span class="tag tag-page" title="${escapeHtml(page)}">${escapeHtml(page)}</span>`;
+}

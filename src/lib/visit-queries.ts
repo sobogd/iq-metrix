@@ -44,9 +44,11 @@ export interface VisitListItem {
   eventCount: number;
   /** Distinct pages visited (lateral aggregate below). */
   pageCount: number;
-  /** Page of the FIRST event (lateral aggregate below). */
+  /** First page of the visit — its concrete pathname ("/", "/ru/feature-slug")
+   *  when the events carry one, else the coarse `page` label (events ingested
+   *  before path capture). Rendered as the row's entry-page chip. */
   firstPage: string | null;
-  /** Page of the most recent event (lateral aggregate below). */
+  /** Last page of the visit, in the same path ?? label form. */
   lastPage: string | null;
 }
 
@@ -75,8 +77,8 @@ export async function listVisits(
     LEFT JOIN LATERAL (
       SELECT count(*)::int AS "eventCount",
              count(DISTINCT "page")::int AS "pageCount",
-             (array_agg("page" ORDER BY at ASC))[1] AS "firstPage",
-             (array_agg("page" ORDER BY at DESC))[1] AS "lastPage"
+             (array_agg(coalesce("path", "page") ORDER BY at ASC))[1] AS "firstPage",
+             (array_agg(coalesce("path", "page") ORDER BY at DESC))[1] AS "lastPage"
       FROM "Event"
       WHERE "visitId" = v.id
     ) e ON true

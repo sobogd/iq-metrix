@@ -118,6 +118,12 @@ model Event {
   action String // "Show" | "Click" | "Register" | …
   name   String // "Pageview", "Header sign in", …
 
+  // Concrete pathname of the page the event happened on ("/", "/ru",
+  // "/ru/feature-slug"), stamped by the tracking clients since 2026-09 —
+  // `page` stays the coarse type label, `path` is the real URL. Null for
+  // legacy events (and for server-fired events that never had a page).
+  path   String?
+
   locale String? // locale the page was rendered in, e.g. "es"
   app    String? // sub-app the event happened in — the owner can switch mid-visit
   // Per-event metadata — the source of truth (an owner can switch restaurant

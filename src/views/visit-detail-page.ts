@@ -13,7 +13,7 @@ import {
   fmtVisitRange,
   renderMetaChips,
 } from "./format";
-import { chip, clientChip, deviceChip, osChip, sourceChip, themeChip } from "./tags";
+import { chip, clientChip, deviceChip, osChip, pageChip, sourceChip, themeChip } from "./tags";
 
 // Separate page (GET /visits/:id), not a <dialog> opened from the list row.
 // Picked over a dialog because this app deliberately has no client JS
@@ -158,7 +158,7 @@ function renderEvent(e: Event, registry: ReturnType<typeof asMetaKeysRegistry>):
   <div class="evt">
     <time class="evt-time" datetime="${escapeHtml(e.at.toISOString())}" title="${escapeHtml(full)}">${fmtClock(e.at)}</time>
     <div class="evt-body">
-      <span class="tag tag-page">${escapeHtml(e.page)}</span>
+      ${pageChip(e.path, e.page)}
       ${actionChip(e.action)}
       <span class="evt-name">${escapeHtml(e.name)}</span>
       ${extra.join("")}
