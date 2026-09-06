@@ -1,6 +1,6 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
-import { countryEmoji, countryName, fmtShortDateTime } from "./format";
+import { countryEmoji, countryName, fmtHM } from "./format";
 import { chip, clientChip, deviceChip, entryChip, osChip, searchCrawlerChip, sourceChip, themeChip } from "./tags";
 import type { DaySummary, VisitListItem } from "../lib/visit-queries";
 
@@ -79,64 +79,74 @@ function renderSummary(s: DaySummary, live: number, isToday: boolean): string {
 }
 
 // ---------------------------------------------------------------------------
-// Compact visit rows — up to three short lines per session:
-//   line 1: flag + country · region · city ......... referrer/type pill + evts
-//           (the location truncates to one line — full string in the title;
-//           a real referrer REPLACES the type tag: green "via <referrer>"
-//           chip whenever one exists. Only with no referrer does the type
-//           tag show — "search" verdicts get a red "search crawler" pill
-//           (the engine's own crawler), ai/preview/bot their plain red pill,
-//           humans nothing)
-//   line 2: colored TEXT tags (no emoji) — the last-activity time FIRST
-//           (the recency anchor), then the ENTRY PAGE — where the session
-//           opened, its concrete path ("/", "/ru/feature-slug"; the coarse
-//           page label for pre-path sessions) — then OS, "Tablet" only when
-//           it really is one, the "from" source, theme, lang. "via
-//           <referrer>" never repeats here — line 1 owns it. The
-//           session-duration pill is gone from the list; long referrer / geo
-//           text truncates instead of spreading the row.
-//   line 3: the email tag — only when the visit is identified; anonymous
-//           sessions get no line at all.
-// No app/landing label — it only confused the list. The whole row links to
-// the visit detail, carrying the day back so "← Back to visits" returns to
-// the same day.
+// Compact visit rows — chip lines, no wrapping (each line truncates instead):
+//   line 1: GEOGRAPHY chips — country (flag + name), region, city. Every chip
+//           is at least 20% of the row wide and grows to share it; long
+//           values ellipsize (full value in the title). Region/city omitted
+//           when empty, the whole line when there is nothing known.
+//   line 2: the ENTRY ADDRESS — where the session opened, as one full-width
+//           purple pill ("/", "/ru/feature-slug"; the coarse page label for
+//           pre-path sessions). Truncates to the row width.
+//   line 3: the remaining chips, all on ONE line — last-activity time first
+//           (HH:MM only — the day lives in the header navigator), then the
+//           event count (just the number), then the source ("via <referrer>"
+//           / red bot pill when there is no referrer / "from <campaign>"),
+//           OS, "Tablet" only when it really is one, theme, language. Chips
+//           shrink & ellipsize before wrapping; time and count never shrink.
+//   line 4: the email chip — only when the visit is identified; anonymous
+//           sessions get no identity line at all.
+// The whole row links to the visit detail, carrying the day back so
+// "← Back to visits" returns to the same day.
 // ---------------------------------------------------------------------------
 
+/** A plain chip whose long value truncates with the full text in the title —
+ *  for geography pieces (region/city) where the value IS the whole content. */
+function placeChip(cls: string, text: string): string {
+  return `<span class="tag ${cls}" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+}
+
 function renderRow(item: VisitListItem, dayKey: string): string {
-  const geo = [countryName(item.country), item.region, item.city].filter(Boolean).join(" · ");
+  // Line 1 — geography as chips. The country chip carries the flag.
+  const geoChips: string[] = [];
+  if (item.country && item.country !== "XX") {
+    const name = countryName(item.country);
+    geoChips.push(placeChip("tag-geo", `${countryEmoji(item.country)} ${name}`));
+  }
+  if (item.region) geoChips.push(placeChip("tag-muted", item.region));
+  if (item.city) geoChips.push(placeChip("tag-muted", item.city));
+  const geoRow = geoChips.length > 0 ? `<div class="r-geo">${geoChips.join("")}</div>` : "";
 
-  // Line-1 right edge, before the event count — see the grammar above.
-  const clientHtml = item.ref
-    ? sourceChip(null, item.ref) // a real referrer instead of any type tag
-    : item.client === "search"
-      ? searchCrawlerChip(item.clientReason)
-      : clientChip(item.client, item.clientReason);
+  // Line 2 — the entry address, full width.
+  const entryRow = item.firstPage ? `<div class="r-page">${entryChip(item.firstPage)}</div>` : "";
 
-  const tags: string[] = [];
-  tags.push(chip("tag-muted", fmtShortDateTime(item.lastAt))); // activity time first
-  // The entry page — where the session opened — sits right after the time
-  // anchor so "what did this visit look like" reads top-down: when they came
-  // in, on what page.
-  if (item.firstPage) tags.push(entryChip(item.firstPage));
-  tags.push(osChip(item.os));
-  tags.push(deviceChip(item.device));
-  // "via <ref>" lives on line 1 when a referrer exists — never repeat it in
-  // the chip row; here the source chip only ever carries "from <campaign>".
-  if (!item.ref) tags.push(sourceChip(item.from, item.ref));
-  tags.push(themeChip(item.theme));
-  if (item.lang) tags.push(chip("tag-muted", item.lang));
-  const tagsHtml = tags.join("")
-    ? `<div class="visit-tags">${tags.join("")}</div>`
-    : "";
+  // Line 3 — everything else. Time leads (HH:MM), then the event count as a
+  // bare number, then source chips, OS, device class, theme, language.
+  const chips: string[] = [];
+  chips.push(chip("tag-muted tag-fixed", fmtHM(item.lastAt)));
+  chips.push(chip("tag-count tag-fixed", String(item.eventCount)));
+  if (item.ref) {
+    chips.push(sourceChip(null, item.ref)); // a real referrer instead of any type tag
+  } else {
+    if (item.client === "search") chips.push(searchCrawlerChip(item.clientReason));
+    else chips.push(clientChip(item.client, item.clientReason));
+    if (item.from) chips.push(sourceChip(item.from, null));
+  }
+  chips.push(osChip(item.os));
+  chips.push(deviceChip(item.device));
+  chips.push(themeChip(item.theme));
+  if (item.lang) chips.push(chip("tag-muted", item.lang));
+  const chipsHtml = chips.join("") ? `<div class="r-tags">${chips.join("")}</div>` : "";
 
   // Anonymous sessions get no identity line at all — nothing is written.
-  const idHtml = item.email ? `<div class="visit-id">${chip("tag-email", item.email)}</div>` : "";
+  const idHtml = item.email
+    ? `<div class="r-id">${chip("tag-email", item.email)}</div>`
+    : "";
 
   return `
   <a class="visit-row" href="/visits/${escapeHtml(item.id)}?site=${escapeHtml(item.siteId)}&day=${escapeHtml(dayKey)}">
-    <div class="visit-geo"><span class="visit-flag">${countryEmoji(item.country)}</span><span class="visit-location" title="${escapeHtml(geo)}">${escapeHtml(geo)}</span></div>
-    <div class="visit-meta">${clientHtml}<span class="visit-events">${item.eventCount} evt</span></div>
-    ${tagsHtml}
+    ${geoRow}
+    ${entryRow}
+    ${chipsHtml}
     ${idHtml}
   </a>`;
 }

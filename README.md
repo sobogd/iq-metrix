@@ -204,28 +204,24 @@ clock regardless of the server's own timezone (`src/views/format.ts`).
 
 The visit list is the raw drill-down for that day — **every** session that
 was active during it, newest-active first, **no pagination** (the list IS the
-day). One compact row per session, up to three short lines:
-the first shows location — flag + `Country · Region · City` (truncated to a
-single line, full string on hover) — with the event count pinned to the
-right edge. What sits before that count: the referrer whenever the visit
-has one — a green `via <referrer>` chip (genuine referral traffic) shown
-instead of any classifier type pill, truncated with the full value on
-hover; only with no referrer does the type tag show — a `search` verdict
-gets a red `search crawler` pill (the engine's own crawler fetching the
-page), `ai`/`preview`/`bot` their plain red pill, humans nothing. The
-second line is a row of colored text tags (no emoji) that opens with the
-last-activity time, then the **entry page** — where the session opened,
-shown as its concrete pathname (`/`, `/ru/feature-slug`; the coarse page
-label for sessions recorded before path capture) — then OS
-(Windows/macOS/iOS/Android — the device form factor is implied), a `Tablet`
-chip only when the visit really came from a tablet (a tablet keeps the same
-OS name, so that one case is worth calling out), the `from <campaign>` tag
-when one exists (`via <referrer>` is never repeated here — line 1 owns it),
-light/dark theme and language — the old session-duration pill is gone from
-the list (the window length still lives on the detail page); the third
-appears only for identified sessions and carries the email tag — anonymous
-rows get no identity line at all. No app/landing label is shown. All
-traffic is still stored and listed — human, search-engine, AI-agent
+day). One compact row per session, built from chip lines that never wrap
+(any line that would overflow truncates its chips, full values on hover):
+the first line is the geography — `Country` (flag inside the chip), `Region`,
+`City` as separate chips, each at least 20% of the line wide, region/city
+omitted when unknown; the second line is the **entry address** — where the
+session opened, as one full-width pill showing the concrete pathname (`/`,
+`/ru/feature-slug`; the coarse page label for sessions recorded before path
+capture); the third line holds all the remaining chips — last-activity time
+as `HH:MM` only (the selected day lives in the header, so no date is shown),
+the event count as a bare-number chip, then the source (a green
+`via <referrer>` chip, or the red `search crawler` / bot pill when there is
+no referrer, or `from <campaign>`), OS (Windows/macOS/iOS/Android — the
+device form factor is implied), a `Tablet` chip only when the visit really
+came from a tablet, theme and language — time and the count never shrink;
+the fourth line appears only for identified sessions and carries the email
+tag — anonymous rows get no identity line at all. No app/landing label is
+shown, no duration pill (the window length still lives on the detail page).
+All traffic is still stored and listed — human, search-engine, AI-agent
 and other-bot visits alike — with no lens to hide any of it. The whole
 row links to the visit detail, carrying the selected day along
 (`/visits/:id?site=…&day=…`) so "← Back to visits" (and the delete flow)

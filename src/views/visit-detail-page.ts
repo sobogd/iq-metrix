@@ -53,19 +53,18 @@ function kvCode(label: string, value: string, keep = 24): string {
 }
 
 // ---------------------------------------------------------------------------
-// Session head — deliberately the SAME grammar as a sessions-list row
-// (visit-list-page.ts): location + activity-window on the first line, then a
-// wrap-around row of colored attribute chips, then the identity (email) chip.
-// The verbose id/key/hash rows that used to live in a tall label grid are
-// folded into a collapsed native <details> below the head — no JS needed.
+// Session head — its own compact card: location text + activity window and
+// event count on the first line, then a wrap-around row of attribute chips,
+// then the identity (email) chip. The sessions-list rows moved to a
+// different (chip-only) grammar — see visit-list-page.ts; only the chip
+// vocabulary (tags.ts) is shared. The verbose id/key/hash rows that used to
+// live in a tall label grid are folded into a collapsed native <details>
+// below the head — no JS needed.
 // ---------------------------------------------------------------------------
 
-/** Chips for the head's tag row. Order matches the list rows: app (when the
- *  site uses sub-apps), OS, tablet, via/from source, theme, lang, then the
- *  activity-window length — the list's own tag row opens with the
- *  last-activity time instead and drops the duration pill, and its line 1
- *  shows the referrer (or the type pill when there is none) before the
- *  event count; the red non-human pill closes the head's own tag row. */
+/** Chips for the head's tag row: app (when the site uses sub-apps), OS,
+ *  tablet, via/from source, theme, lang, then the activity-window length;
+ *  the red non-human pill closes the head's own tag row. */
 function renderHeadTags(visit: Visit): string {
   const tags: string[] = [];
   if (visit.app) tags.push(chip("tag-muted", visit.app));

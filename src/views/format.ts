@@ -50,6 +50,20 @@ export function fmtClock(d: Date): string {
   }).format(d);
 }
 
+/** "20:34" — clock without seconds, Europe/Madrid. Sessions-list rows live
+ *  under the day navigator, so the date would be noise: the day is in the
+ *  header and the row chip shows just when the session was last active. */
+export function fmtHM(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: MADRID_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const get = (t: string): string => parts.find((p) => p.type === t)?.value ?? "00";
+  return `${get("hour")}:${get("minute")}`;
+}
+
 /** Calendar-day key of a timestamp on the Madrid clock ("27.08.2025") — used
  *  to break a long event stream into per-day groups. */
 export function fmtMadridDay(d: Date): string {

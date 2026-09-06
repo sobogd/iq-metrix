@@ -223,15 +223,19 @@ code {
 
 /* ---------- Visit list rows ---------- *
  *
- * One compact row per session, up to three short lines:
- *   line 1 — location: flag + country · region · city, with the
- *            date/time and event count pinned to the right;
- *   line 2 — colored TEXT tags (no emoji): OS, "Tablet" only when it
- *            really is one, via/from source, theme, lang, duration;
- *   line 3 — the email tag, only when the visit is identified — anonymous
- *            sessions get no identity line at all.
- * The whole row is one link to the visit detail page. Single full-width
- * list item on phone; no table/card switch needed.
+ * One compact row per session — chip lines that never wrap (each line
+ * truncates its chips instead):
+ *   line 1 — geography chips: country (flag + name), region, city. Every
+ *            chip is at least 20% of the line wide and grows to share it;
+ *            too-long values ellipsize (title = full).
+ *   line 2 — the entry address: one full-width purple pill.
+ *   line 3 — the remaining chips on ONE line: last-activity HH:MM (the day
+ *            lives in the header navigator, so no date), the event count as
+ *            a bare number, then the source, OS, "Tablet", theme, language —
+ *            chips shrink & ellipsize instead of wrapping.
+ *   line 4 — the email chip, only when the visit is identified.
+ * The whole row is one link to the visit detail page. (The session-detail
+ * head keeps the older text-location grammar — see "Visit detail".)
  */
 
 .visits {
@@ -241,11 +245,9 @@ code {
 }
 
 .visit-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  column-gap: 12px;
-  row-gap: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -258,8 +260,62 @@ code {
   border-color: var(--accent);
 }
 
-/* Line 1 — location (left, truncating) + classifier/referrer pill & event
-   count (right) */
+/* Row 1 — geography chips. Each chip is at least 20% of the line wide and
+   grows to share it; text too long for the share ellipsizes. */
+.r-geo {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.r-geo .tag {
+  flex: 1 1 20%;
+  min-width: 20%;
+  justify-content: flex-start;
+}
+
+/* Row 2 — entry address, one full-width pill. */
+.r-page {
+  min-width: 0;
+}
+
+.r-page .tag {
+  width: 100%;
+  max-width: none;
+  justify-content: flex-start;
+  font-weight: 600;
+}
+
+/* Row 3 — the rest of the chips on ONE line: chips shrink (and ellipsize)
+   once the line is full instead of wrapping. Time and the event count carry
+   .tag-fixed and never shrink. */
+.r-tags {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.r-tags .tag {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.r-tags .tag-fixed {
+  flex: 0 0 auto;
+}
+
+/* Row 4 — the identity chip, only for identified sessions. */
+.r-id {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Session-detail head — location text (left) + activity window and event
+   count (right). These classes are no longer used by sessions-list rows
+   (those moved to the chip grammar above), only by the detail head. */
 .visit-geo {
   display: flex;
   align-items: baseline;
@@ -273,21 +329,13 @@ code {
   line-height: 1;
 }
 
+/* Row 1 of the session-detail head (kept from the old list grammar) — the
+   location text truncates only if it ever outgrows the head column. */
 .visit-location {
   font-weight: 600;
   font-size: 14px;
   line-height: 1.35;
   overflow-wrap: anywhere;
-}
-
-/* In list rows the location must stay on ONE line no matter how long the
-   region name is: ellipsis-truncate it, full string rides in the title. */
-.visit-row .visit-location {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  overflow-wrap: normal;
 }
 
 .visit-meta {
@@ -300,18 +348,12 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
-/* A long "via <referrer>" chip on line 1 truncates instead of stretching
-   the row — the .tag ellipsis kicks in once the width is capped. */
-.visit-meta .tag {
-  max-width: 200px;
-}
-
 .visit-events {
   color: var(--accent-2);
   font-weight: 600;
 }
 
-/* Lines 2–3 — tag rows (span the full row width) */
+/* Lines 2–4 of the session-detail head — chip rows (span the full width) */
 .visit-tags,
 .visit-id {
   grid-column: 1 / -1;
@@ -380,6 +422,25 @@ code {
   border: 1px solid var(--border);
 }
 
+/* Geography chips in sessions-list rows — the country chip carries the flag
+   and reads the strongest of the three; region and city reuse .tag-muted. */
+.tag-geo {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+/* Event-count chip — the bare number in the rest-chip line; tabular figures
+   keep columns of counts aligned down the list. */
+.tag-count {
+  color: var(--accent-2);
+  font-weight: 700;
+  background: rgba(126, 224, 195, 0.08);
+  border: 1px solid rgba(126, 224, 195, 0.32);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Event-stream pills (visit detail). The page an event happened on, plus the
  * action verb split into "interaction" vs "conversion" so a funnel scans:
  * clicks/inputs read blue, registration/subscription-like moments gold. */
@@ -391,14 +452,11 @@ code {
 
 /* Page/path chips carry full URL pathnames ("/ru/feature-slug") — cap their
    width so a long path ellipsizes instead of pushing the rest of the event
-   line (detail) or the whole tag row (list) out. The full path rides in the
-   chip's title attribute. */
+   line (detail) out. The full path rides in the chip's title attribute.
+   (Sessions-list rows override this via .r-page .tag to span the whole
+   line.) */
 .evt-body .tag-page {
   max-width: min(340px, 70vw);
-}
-
-.visit-tags .tag-page {
-  max-width: 260px;
 }
 
 .tag-interact {
