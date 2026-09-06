@@ -77,11 +77,12 @@ function renderSummary(s: DaySummary): string {
 }
 
 // ---------------------------------------------------------------------------
-// Compact visit rows — chip lines, no wrapping (each line truncates instead):
-//   line 1: GEOGRAPHY chips — country (flag + name), region, city. Every chip
-//           is at least 20% of the row wide and grows to share it; long
-//           values ellipsize (full value in the title). Region/city omitted
-//           when empty, the whole line when there is nothing known.
+// Compact visit rows — mixed lines that never wrap (each line truncates
+// instead):
+//   line 1: GEOGRAPHY as plain text — country flag emoji, country name, and
+//           when there is a region or a city a 📍 marker followed by the
+//           region, then a comma-separated city (no commas when those parts
+//           are missing): "🇪🇸 Spain 📍 California, San Francisco".
 //   line 2: the ENTRY ADDRESS — where the session opened, as one full-width
 //           purple pill ("/", "/ru/feature-slug"; the coarse page label for
 //           pre-path sessions). Truncates to the row width.
@@ -99,22 +100,17 @@ function renderSummary(s: DaySummary): string {
 // "← Back to visits" returns to the same day.
 // ---------------------------------------------------------------------------
 
-/** A plain chip whose long value truncates with the full text in the title —
- *  for geography pieces (region/city) where the value IS the whole content. */
-function placeChip(cls: string, text: string): string {
-  return `<span class="tag ${cls}" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
-}
-
 function renderRow(item: VisitListItem, dayKey: string): string {
-  // Line 1 — geography as chips. The country chip carries the flag.
-  const geoChips: string[] = [];
-  if (item.country && item.country !== "XX") {
-    const name = countryName(item.country);
-    geoChips.push(placeChip("tag-geo", `${countryEmoji(item.country)} ${name}`));
-  }
-  if (item.region) geoChips.push(placeChip("tag-muted", item.region));
-  if (item.city) geoChips.push(placeChip("tag-muted", item.city));
-  const geoRow = geoChips.length > 0 ? `<div class="r-geo">${geoChips.join("")}</div>` : "";
+  // Line 1 — geography as one plain text line: flag + country, then "📍
+  // Region, City" when those exist (the comma only appears between region
+  // and city, so neither a missing region nor a missing city leaves one
+  // dangling). The flag never truncates; the text to its right does.
+  const flag = countryEmoji(item.country);
+  const country = countryName(item.country);
+  const placeParts = [item.region, item.city].filter(Boolean);
+  const place = placeParts.length > 0 ? ` 📍 ${placeParts.join(", ")}` : "";
+  const geoText = `${country}${place}`;
+  const geoRow = `<div class="r-geo"><span class="r-geo-flag">${flag}</span><span class="r-geo-text" title="${escapeHtml(geoText)}">${escapeHtml(geoText)}</span></div>`;
 
   // Line 2 — the entry address, full width.
   const entryRow = item.firstPage ? `<div class="r-page">${entryChip(item.firstPage)}</div>` : "";

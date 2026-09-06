@@ -303,19 +303,31 @@ code {
   box-shadow: 0 0 0 1px rgba(126, 224, 195, 0.22);
 }
 
-/* Row 1 — geography chips. Each chip is at least 20% of the line wide and
-   grows to share it; text too long for the share ellipsizes. */
+/* Row 1 — geography as one plain text line: flag + country, then "📍 Region,
+   City". The flag never truncates; the text next to it ellipsizes when the
+   line is full (full value in the title). */
 .r-geo {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  align-items: baseline;
+  gap: 8px;
   min-width: 0;
+  font-size: 14px;
 }
 
-.r-geo .tag {
-  flex: 1 1 20%;
-  min-width: 20%;
-  justify-content: flex-start;
+.r-geo-flag {
+  flex: 0 0 auto;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.r-geo-text {
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
 }
 
 /* Row 2 — entry address, one full-width pill. */
@@ -461,15 +473,6 @@ code {
 
 .tag-muted {
   color: var(--muted);
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-}
-
-/* Geography chips in sessions-list rows — the country chip carries the flag
-   and reads the strongest of the three; region and city reuse .tag-muted. */
-.tag-geo {
-  color: var(--text);
-  font-weight: 600;
   background: var(--panel-2);
   border: 1px solid var(--border);
 }

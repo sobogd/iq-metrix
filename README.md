@@ -206,11 +206,13 @@ clock regardless of the server's own timezone (`src/views/format.ts`).
 
 The visit list is the raw drill-down for that day — **every** session that
 was active during it, newest-active first, **no pagination** (the list IS the
-day). One compact row per session, built from chip lines that never wrap
-(any line that would overflow truncates its chips, full values on hover):
-the first line is the geography — `Country` (flag inside the chip), `Region`,
-`City` as separate chips, each at least 20% of the line wide, region/city
-omitted when unknown; the second line is the **entry address** — where the
+day). One compact row per session, built from lines that never wrap (any
+line that would overflow truncates, full value on hover):
+the first line is the geography as plain text — country flag emoji, country
+name, then, when there is a region or a city, a 📍 marker followed by the
+region and a comma-separated city (`🇪🇸 Spain 📍 California, San Francisco`;
+no commas dangle when either part is missing); the second line is the
+**entry address** — where the
 session opened, as one full-width pill showing the concrete pathname (`/`,
 `/ru/feature-slug`; the coarse page label for sessions recorded before path
 capture); the third line holds all the remaining chips — last-activity time
