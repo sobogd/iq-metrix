@@ -1,7 +1,7 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { countryEmoji, countryName, fmtHM } from "./format";
-import { chip, clientChip, deviceChip, entryChip, osChip, searchCrawlerChip, sourceChip, themeChip } from "./tags";
+import { chip, clientKindLabel, deviceChip, entryChip, osChip, sourceChip, themeChip } from "./tags";
 import type { DaySummary, VisitListItem } from "../lib/visit-queries";
 
 export interface VisitListPageData {
@@ -83,16 +83,19 @@ function renderSummary(s: DaySummary): string {
 //           when there is a region or a city a 📍 marker followed by the
 //           region, then a comma-separated city (no commas when those parts
 //           are missing): "🇪🇸 Spain 📍 California, San Francisco".
-//   line 2: the ENTRY ADDRESS — where the session opened, as one full-width
+//   line 2: the CLIENT, one combined field (verdict + reason flattened into
+//           a single readable line, e.g. "Search engine · Google (IP
+//           verified)") as plain text — humans get no line at all.
+//   line 3: the ENTRY ADDRESS — where the session opened, as one full-width
 //           purple pill ("/", "/ru/feature-slug"; the coarse page label for
 //           pre-path sessions). Truncates to the row width.
-//   line 3: the remaining chips, all on ONE line — last-activity time first
+//   line 4: the remaining chips, all on ONE line — last-activity time first
 //           (HH:MM only — the day lives in the header navigator), then the
 //           event count (just the number), then the source ("via <referrer>"
-//           / red bot pill when there is no referrer / "from <campaign>"),
-//           OS, "Tablet" only when it really is one, theme, language. Chips
-//           shrink & ellipsize before wrapping; time and count never shrink.
-//   line 4: the email chip — only when the visit is identified; anonymous
+//           / "from <campaign>"), OS, "Tablet" only when it really is one,
+//           theme, language. Chips shrink & ellipsize before wrapping; time
+//           and count never shrink.
+//   line 5: the email chip — only when the visit is identified; anonymous
 //           sessions get no identity line at all.
 // A session that fired an event in the last ~30 minutes is STILL LIVE and its
 // whole row gets a green border instead of the usual one.
@@ -112,21 +115,21 @@ function renderRow(item: VisitListItem, dayKey: string): string {
   const geoText = `${country}${place}`;
   const geoRow = `<div class="r-geo"><span class="r-geo-flag">${flag}</span><span class="r-geo-text" title="${escapeHtml(geoText)}">${escapeHtml(geoText)}</span></div>`;
 
-  // Line 2 — the entry address, full width.
+  // Line 2 — the client as one combined field (kind + reason in a single
+  // readable line). Empty for humans — a real visitor needs no annotation.
+  const kindText = clientKindLabel(item.client, item.clientReason);
+  const clientRow = kindText ? `<div class="r-client">${escapeHtml(kindText)}</div>` : "";
+
+  // Line 3 — the entry address, full width.
   const entryRow = item.firstPage ? `<div class="r-page">${entryChip(item.firstPage)}</div>` : "";
 
-  // Line 3 — everything else. Time leads (HH:MM), then the event count as a
+  // Line 4 — everything else. Time leads (HH:MM), then the event count as a
   // bare number, then source chips, OS, device class, theme, language.
   const chips: string[] = [];
   chips.push(chip("tag-muted tag-fixed", fmtHM(item.lastAt)));
   chips.push(chip("tag-count tag-fixed", String(item.eventCount)));
-  if (item.ref) {
-    chips.push(sourceChip(null, item.ref)); // a real referrer instead of any type tag
-  } else {
-    if (item.client === "search") chips.push(searchCrawlerChip(item.clientReason));
-    else chips.push(clientChip(item.client, item.clientReason));
-    if (item.from) chips.push(sourceChip(item.from, null));
-  }
+  if (item.ref) chips.push(sourceChip(null, item.ref));
+  else if (item.from) chips.push(sourceChip(item.from, null));
   chips.push(osChip(item.os));
   chips.push(deviceChip(item.device));
   chips.push(themeChip(item.theme));
@@ -141,6 +144,7 @@ function renderRow(item: VisitListItem, dayKey: string): string {
   return `
   <a class="visit-row${item.live ? " visit-row-live" : ""}" href="/visits/${escapeHtml(item.id)}?site=${escapeHtml(item.siteId)}&day=${escapeHtml(dayKey)}">
     ${geoRow}
+    ${clientRow}
     ${entryRow}
     ${chipsHtml}
     ${idHtml}

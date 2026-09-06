@@ -304,19 +304,20 @@ code {
 }
 
 /* Row 1 — geography as one plain text line: flag + country, then "📍 Region,
-   City". The flag never truncates; the text next to it ellipsizes when the
-   line is full (full value in the title). */
+   City". Text is chip-sized (11.5px) like every other value on the row. The
+   flag never truncates; the text next to it ellipsizes when the line is
+   full (full value in the title). */
 .r-geo {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
-  font-size: 14px;
+  font-size: 11.5px; /* same size as .tag chips */
 }
 
 .r-geo-flag {
   flex: 0 0 auto;
-  font-size: 17px;
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -328,6 +329,17 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   overflow-wrap: normal;
+}
+
+/* Row 2 — the client, one combined plain-text field above the entry
+   address. Chip-sized, muted, truncating to one line. */
+.r-client {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Row 2 — entry address, one full-width pill. */

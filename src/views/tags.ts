@@ -62,13 +62,93 @@ export function clientChip(client: string | null, reason: string | null): string
   return `<span class="tag tag-bot"${title}>${escapeHtml(client)}</span>`;
 }
 
-/** "Search crawler" pill — a `search` verdict that arrived with NO referrer:
- *  the search engine's own crawler indexing the page. Whenever a visit has a
- *  real referrer the sessions list shows that referrer (green "via …")
- *  instead of any type pill — see visit-list-page.ts. */
-export function searchCrawlerChip(reason: string | null): string {
-  const title = reason ? ` title="${escapeHtml(reason)}"` : "";
-  return `<span class="tag tag-bot"${title}>search crawler</span>`;
+// ---------------------------------------------------------------------------
+// One combined "what is this client" field — the classification verdict plus
+// its reason as a single human-readable line. The sessions list shows it as
+// plain text above the entry address instead of the two separate red pills
+// (label + tooltip reason). Token names stay in their canonical casing.
+// ---------------------------------------------------------------------------
+
+const CLIENT_TOKEN_NAMES: Record<string, string> = {
+  // search engines
+  googlebot: "Google", "googlebot-image": "Google Images", "googlebot-news": "Google News",
+  "googlebot-video": "Google Video", bingbot: "Bing", msnbot: "Bing", slurp: "Yahoo!",
+  duckduckbot: "DuckDuckGo", yandexbot: "Yandex", yandexmobilebot: "Yandex Mobile",
+  baiduspider: "Baidu", sogou: "Sogou", yisouspider: "Sogou", naverbot: "Naver",
+  seznambot: "Seznam", qwantify: "Qwant", petalbot: "Petal Search", applebot: "Apple",
+  // AI crawlers
+  gptbot: "OpenAI GPTBot", chatgpt: "ChatGPT", openai: "OpenAI", "oai-searchbot": "OpenAI",
+  "gpt-": "OpenAI", claude: "Claude", claudebot: "Claude", anthropic: "Anthropic",
+  perplexitybot: "Perplexity", perplexity: "Perplexity", gemini: "Google Gemini",
+  "google-extended": "Google (AI)", bard: "Google Bard", cohere: "Cohere",
+  youdot: "You.com", phind: "Phind", kimi: "Kimi", moonshot: "Moonshot AI",
+  mistral: "Mistral", "meta-externalagent": "Meta", "meta-externalfetcher": "Meta",
+  amazonbot: "Amazon", bytespider: "ByteDance", ccbot: "Common Crawl",
+  diffbot: "Diffbot", "applebot-extended": "Apple", omgili: "OMGili",
+  imagesiftbot: "ImageSift",
+  // link previews / social unfurlers
+  twitterbot: "X (Twitter)", facebookexternalhit: "Facebook", facebookcatalog: "Facebook",
+  facebot: "Facebook", slackbot: "Slack", linkedinbot: "LinkedIn", discordbot: "Discord",
+  telegrambot: "Telegram", whatsapp: "WhatsApp", skypeuripreview: "Skype",
+  pinterest: "Pinterest", pinterestbot: "Pinterest", tumblr: "Tumblr",
+  redditbot: "Reddit", viber: "Viber", imessage: "iMessage", "line-preview": "LINE",
+  bytedancewebview: "ByteDance", tiktokbot: "TikTok", bingpreview: "Bing",
+  // monitors / other bots
+  uptimerobot: "UptimeRobot", pingdom: "Pingdom", site24x7: "Site24x7",
+  statuscake: "StatusCake", newrelicpinger: "New Relic", newrelicsynthetics: "New Relic",
+  synthetics: "New Relic", datadogsynthetics: "Datadog", qualys: "Qualys",
+  catchpoint: "Catchpoint", "dotcom-monitor": "Dotcom-Monitor", "node-supervisor": "PM2",
+  adsbot: "Google AdsBot", "adsbot-google": "Google AdsBot", "apis-google": "Google",
+  "feedfetcher-google": "Google", "storebot-google": "Google", semrushbot: "Semrush",
+  ahrefsbot: "Ahrefs", majestic: "Majestic", mj12bot: "Majestic-12",
+  ia_archiver: "Internet Archive", dotbot: "Moz", rogerbot: "Moz",
+  blexbot: "BLEX", exabot: "Exalead", dataforseobot: "DataForSEO",
+  seokicks: "SeoKicks", builtwith: "BuiltWith", wappalyzer: "Wappalyzer",
+  seobility: "Seobility", moz: "Moz", mzcrawler: "MercadoLibre",
+  linkdexbot: "Linkdex", sistrix: "SISTRIX", serpstatbot: "Serpstat",
+  netcraftsurveyagent: "Netcraft", "microsoft office": "Microsoft Office",
+  excel: "Excel", onenote: "OneNote", outlook: "Outlook",
+  skypeforbusiness: "Skype for Business", teams: "Teams",
+};
+
+function prettyToken(token: string): string {
+  const known = CLIENT_TOKEN_NAMES[token];
+  if (known) return known;
+  // Fallback: the token in title-ish case, "googlebot-image" → "Googlebot-image".
+  return token.replace(/(^|-)([a-z])/g, (_m, sep, ch: string) => `${sep === "-" ? " " : ""}${ch.toUpperCase()}`);
+}
+
+/** The one combined client field: kind + reason flattened into a single
+ *  readable line ("Search engine · Google (IP verified)", "AI crawler ·
+ *  OpenAI GPTBot", "Bot · no browser markers", …). Empty for humans — a
+ *  real visitor needs no annotation. */
+export function clientKindLabel(client: string | null, reason: string | null): string {
+  if (!client || client === "human") return "";
+  const r = reason ?? "";
+  const strip = (prefix: string): string | null =>
+    r.startsWith(`${prefix}:`) ? r.slice(prefix.length + 1) : null;
+
+  const spoof = strip("dns-spoof");
+  if (spoof) return `Spoofed crawler · claims ${prettyToken(spoof)}`;
+  const dns = strip("dns");
+  if (dns) return `Search engine · ${prettyToken(dns)} (IP verified)`;
+  const preview = strip("preview");
+  if (preview) return `Link preview · ${prettyToken(preview)}`;
+  const monitor = strip("monitor");
+  if (monitor) return `Monitor · ${prettyToken(monitor)}`;
+  if (r === "behaviour:burst") return "Bot · burst pattern";
+  if (r === "isbot") return "Bot · isbot heuristic";
+  if (r === "no-browser-markers") return "Bot · no browser markers";
+  const token = strip("token");
+  if (token) {
+    const name = prettyToken(token);
+    if (client === "search") return `Search engine · ${name}`;
+    if (client === "ai") return `AI crawler · ${name}`;
+    return `Bot · ${name}`;
+  }
+  // Unknown reason shape — say what the kind is and keep the raw reason.
+  const kind = client === "search" ? "Search engine" : client === "ai" ? "AI crawler" : client === "preview" ? "Link preview" : "Bot";
+  return r ? `${kind} · ${r}` : kind;
 }
 
 /** One "which page" pill — the purple tag the detail event stream uses for

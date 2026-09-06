@@ -207,24 +207,30 @@ clock regardless of the server's own timezone (`src/views/format.ts`).
 The visit list is the raw drill-down for that day — **every** session that
 was active during it, newest-active first, **no pagination** (the list IS the
 day). One compact row per session, built from lines that never wrap (any
-line that would overflow truncates, full value on hover):
+line that would overflow truncates, full value on hover); every text value
+renders at the same chip size:
 the first line is the geography as plain text — country flag emoji, country
 name, then, when there is a region or a city, a 📍 marker followed by the
 region and a comma-separated city (`🇪🇸 Spain 📍 California, San Francisco`;
 no commas dangle when either part is missing); the second line is the
+**client** as one combined field — verdict and reason flattened into a single
+readable line (`Search engine · Google`, `Search engine · Google (IP
+verified)`, `AI crawler · OpenAI GPTBot`, `Bot · no browser markers`, `Link
+preview · X (Twitter)`, …), plain text above the address, shown only for
+non-human traffic; the third line is the
 **entry address** — where the
 session opened, as one full-width pill showing the concrete pathname (`/`,
 `/ru/feature-slug`; the coarse page label for sessions recorded before path
-capture); the third line holds all the remaining chips — last-activity time
+capture); the fourth line holds all the remaining chips — last-activity time
 as `HH:MM` only (the selected day lives in the header, so no date is shown),
 the event count as a bare-number chip, then the source (a green
-`via <referrer>` chip, or the red `search crawler` / bot pill when there is
-no referrer, or `from <campaign>`), OS (Windows/macOS/iOS/Android — the
-device form factor is implied), a `Tablet` chip only when the visit really
-came from a tablet, theme and language — time and the count never shrink;
-the fourth line appears only for identified sessions and carries the email
-tag — anonymous rows get no identity line at all. No app/landing label is
-shown, no duration pill (the window length still lives on the detail page).
+`via <referrer>` chip or `from <campaign>`), OS (Windows/macOS/iOS/Android —
+the device form factor is implied), a `Tablet` chip only when the visit
+really came from a tablet, theme and language — time and the count never
+shrink; the fifth line appears only for identified sessions and carries the
+email tag — anonymous rows get no identity line at all. No app/landing label
+is shown, no duration pill (the window length still lives on the detail
+page).
 A session whose last event falls within the last ~30 minutes is still live
 and its whole row is highlighted with a green border — the modern stand-in
 for the removed "Live" counter. All
