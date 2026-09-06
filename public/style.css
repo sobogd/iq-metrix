@@ -394,13 +394,23 @@ code {
   text-overflow: ellipsis;
 }
 
-/* Line 3 — dot-separated colored values; a plain text line, so it wraps
-   instead of hiding anything. The theme emoji sits right before HH:MM. */
+/* Line 3 — dot-separated colored values. The theme emoji sits right before
+   HH:MM. The source (via/from) is a separate segment: mobile-first it lives
+   on its own line under the rest; on wide screens it joins the same line
+   with a dot before it. */
 .r-meta {
   min-width: 0;
   font-size: 14px;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.r-meta-main {
+  display: block;
+}
+
+.r-meta-src {
+  display: block;
 }
 
 .r-theme {
@@ -412,6 +422,19 @@ code {
   min-width: 0;
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+
+/* Wide screens: everything on the meta line stays inline, the source joins
+   the dot-separated flow. */
+@media (min-width: 721px) {
+  .r-meta-main,
+  .r-meta-src {
+    display: inline;
+  }
+
+  .r-meta-src::before {
+    content: " · ";
+  }
 }
 
 /* Narrow screens: the client becomes its own full-width line under the

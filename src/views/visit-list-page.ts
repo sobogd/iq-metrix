@@ -108,8 +108,8 @@ function renderSummary(s: DaySummary): string {
 //            the visit recorded a pathname.
 //   line 3 — dot-separated values, each in its chip color: theme as an emoji
 //            (🌙/☀️) right before the last-activity HH:MM, then the event
-//            count, via/from source, OS, "Tablet", language — wraps if it
-//            has to.
+//            count, OS, "Tablet", language; the via/from source rides inline
+//            on wide screens and on its own line on narrow ones.
 //   line 4 — the EMAIL in its green, only when the visit is identified.
 // The whole row links to the visit detail, carrying the day back so
 // "← Back to visits" returns to the same day.
@@ -137,17 +137,23 @@ function renderRow(item: VisitListItem, dayKey: string): string {
     : "";
 
   // Line 3 — dot-separated colored values; theme is an emoji before HH:MM.
+  // The source (via/from) is a separate segment: on a narrow screen it moves
+  // to its own line under everything else, on wide screens it stays inline
+  // in the same dot-separated line.
   const theme = themeEmoji(item.theme);
   const time = `${theme ? `<span class="r-theme" title="${escapeHtml(theme.label)}">${theme.emoji}</span> ` : ""}${flat("muted", fmtHM(item.lastAt))}`;
-  const meta: string[] = [time];
-  meta.push(flat("count", String(item.eventCount)));
-  if (item.ref) meta.push(flat("source", `via ${item.ref}`));
-  else if (item.from) meta.push(flat("source", `from ${item.from}`));
+  const main: string[] = [time];
+  main.push(flat("count", String(item.eventCount)));
   const os = item.os ? OS_LABELS[item.os] : undefined;
-  if (os) meta.push(flat("os", os));
-  if (item.device === "tablet") meta.push(flat("device", "Tablet"));
-  if (item.lang) meta.push(flat("muted", item.lang));
-  const metaRow = `<div class="r-meta">${meta.join(" · ")}</div>`;
+  if (os) main.push(flat("os", os));
+  if (item.device === "tablet") main.push(flat("device", "Tablet"));
+  if (item.lang) main.push(flat("muted", item.lang));
+  const srcHtml = item.ref
+    ? flat("source", `via ${item.ref}`)
+    : item.from
+      ? flat("source", `from ${item.from}`)
+      : "";
+  const metaRow = `<div class="r-meta"><span class="r-meta-main">${main.join(" · ")}</span>${srcHtml ? `<span class="r-meta-src">${srcHtml}</span>` : ""}</div>`;
 
   // Anonymous sessions get no identity line at all — nothing is written.
   const idHtml = item.email
