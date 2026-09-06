@@ -75,12 +75,36 @@ a {
   margin: 0 auto;
 }
 
-/* The selected company id — bold, truncating so the row never overflows. It
-   does not grow: the 🏢/📅 controls sit right next to it and the action
-   buttons stay pinned to the right edge. */
-.topbar-id {
+/* The company block — 🏢 emoji + the selected id in bold; the native
+   <select> lies invisibly over the WHOLE block, so clicking the emoji or the
+   id opens the picker. All header emojis render at the same 18px. */
+.tb-company {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 6px 0 8px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.tb-company:hover {
+  background: var(--panel-2);
+}
+
+.tb-company .tb-face {
+  font-size: 18px;
+}
+
+.tb-company .topbar-id {
   flex: 0 1 auto;
   min-width: 0;
+  max-width: 320px;
+}
+
+/* The selected company id — bold, truncating so the row never overflows. */
+.topbar-id {
   font-weight: 700;
   font-size: 14px;
   line-height: 1.2;
@@ -89,7 +113,7 @@ a {
   text-overflow: ellipsis;
 }
 
-/* The date control — 📅 emoji + the short day text ("7.10.24"), with the
+/* The date control — 📅 emoji + the short day text ("07.09.26"), with the
    native date input over the whole pill. */
 .tb-date {
   position: relative;
@@ -99,12 +123,13 @@ a {
   height: 40px;
   padding: 0 8px;
   border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
   color: var(--text);
   white-space: nowrap;
   cursor: pointer;
-  font-variant-numeric: tabular-nums;
+}
+
+.tb-date .tb-face {
+  font-size: 18px;
 }
 
 .tb-date:hover {
@@ -112,7 +137,10 @@ a {
 }
 
 .tb-day {
+  font-size: 14px;
+  font-weight: 600;
   pointer-events: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .topbar-inner form {

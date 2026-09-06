@@ -44,13 +44,17 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
     )
     .join("");
 
-  // Short day text, "7.10.24" (no padding).
+  // Short day text "07.09.26" (zero-padded day.month + 2-digit year).
   const [y, m, d] = day.split("-").map(Number);
-  const shortDate = `${d}.${m}.${String(y).slice(2)}`;
+  const yy = String(y).slice(2);
+  const shortDate = `${String(d).padStart(2, "0")}.${String(m).padStart(2, "0")}.${yy}`;
 
-  const companyIcon = `<span class="tb-ico" title="Pick a company" aria-label="Pick a company">
+  // Company block: the native <select> lies invisibly over BOTH the 🏢 icon
+  // and the bold id, so clicking either opens the picker.
+  const companyBlock = `<span class="tb-company" title="Pick a company">
   <select class="tb-ghost" aria-label="Pick a company" onchange="location.href=this.value">${options}</select>
   <span class="tb-face" aria-hidden="true">🏢</span>
+  <span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>
 </span>`;
 
   const dateControl = `<span class="tb-date" title="Pick a date">
@@ -62,8 +66,7 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
   return `
 <header class="topbar">
   <div class="topbar-inner">
-    <span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>
-    ${companyIcon}
+    ${companyBlock}
     ${dateControl}
     <div class="topbar-actions">
       ${refresh}
