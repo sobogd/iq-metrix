@@ -30,8 +30,8 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
 <header class="topbar">
   <div class="topbar-inner">
     <div class="topbar-actions">
-      ${refresh}
       ${logout}
+      ${refresh}
     </div>
   </div>
 </header>`;
@@ -69,8 +69,8 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
     ${companyBlock}
     ${dateControl}
     <div class="topbar-actions">
-      ${refresh}
       ${logout}
+      ${refresh}
     </div>
   </div>
 </header>`;
