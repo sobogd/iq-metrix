@@ -117,7 +117,8 @@ export async function markVisitSeen(visitId: string): Promise<void> {
 export async function getVisitDetail(id: string): Promise<{ visit: Visit; events: Event[] } | null> {
   const visit = await prisma.visit.findUnique({ where: { id } });
   if (!visit) return null;
-  const events = await prisma.event.findMany({ where: { visitId: id }, orderBy: { at: "asc" } });
+  // Newest event first — the detail page renders the stream top-down.
+  const events = await prisma.event.findMany({ where: { visitId: id }, orderBy: { at: "desc" } });
   return { visit, events };
 }
 

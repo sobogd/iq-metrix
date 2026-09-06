@@ -244,14 +244,17 @@ row links to the visit detail, carrying the selected day along
 returns to the same day.
 
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
-The event stream is one chip line per event whose first pill shows the page:
-the concrete pathname when the event carries one (`/`, `/ru/feature-slug` —
-hover for the coarse `page` label it replaced), the label itself for events
-recorded before path capture. Meta chips are rendered generically from the
-current site's `Site.metaKeys` registry; a key with a `{v}` link template
-renders as an external link to the source product's own admin, everything else
-as plain text. A danger-outlined "Delete session" link at the bottom of the
-page leads to a JS-free confirm
+Its top row carries the back-crumb and, right next to it, the danger-outlined
+"Delete session" link — near the session's main info, not at the bottom of
+the page. The head keeps the chip grammar (location, activity window, chips,
+email). Below it, every event is a card in exactly the sessions-list layout
+(flat text at 14px, chip colors only, no pills), **newest first**: the head
+line carries the event name with the action verb in its funnel color, the
+page pathname (`/`, `/ru/feature-slug`) sits under it in purple when the
+event recorded one, and a dot-separated meta line holds HH:MM:SS · locale ·
+app · the per-event meta values (keys with a `{v}` link template stay links
+to the source product's own admin). The delete link GETs to a JS-free
+confirm
 page (the same session head re-rendered, so you see exactly what goes); only
 the confirm page's POST actually deletes the visit and its events and
 redirects back to the site's session list.

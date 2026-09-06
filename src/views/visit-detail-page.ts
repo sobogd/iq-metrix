@@ -13,7 +13,7 @@ import {
   fmtVisitRange,
   renderMetaChips,
 } from "./format";
-import { chip, clientChip, deviceChip, osChip, pageChip, sourceChip, themeChip } from "./tags";
+import { chip, clientChip, deviceChip, flat, osChip, sourceChip, themeChip } from "./tags";
 
 // Separate page (GET /visits/:id), not a <dialog> opened from the list row.
 // Picked over a dialog because this app deliberately has no client JS
@@ -53,10 +53,11 @@ function kvCode(label: string, value: string, keep = 24): string {
 }
 
 // ---------------------------------------------------------------------------
-// Session head — its own compact card: location text + activity window and
-// event count on the first line, then a wrap-around row of attribute chips,
-// then the identity (email) chip. The sessions-list rows moved to a
-// different (chip-only) grammar — see visit-list-page.ts; only the chip
+// Session head — its own compact card (kept in the old chip grammar):
+// location text + activity window and event count on the first line, then a
+// wrap-around row of attribute chips, then the identity (email) chip. The
+// sessions list and the events below on this page use the flat-text grammar
+// (visit-list-page.ts / the event cards further down); only the chip
 // vocabulary (tags.ts) is shared. The verbose id/key/hash rows that used to
 // live in a tall label grid are folded into a collapsed native <details>
 // below the head — no JS needed.
@@ -126,10 +127,16 @@ function renderMetaBlock(visit: Visit, registry: ReturnType<typeof asMetaKeysReg
 }
 
 // ---------------------------------------------------------------------------
-// Event stream — one compact row per event, ordered by time. The visible
-// time (HH:MM:SS) is the ordering anchor; page / action / name flow inline
-// as chips + text, and locale/app/meta ride at the end of the same line so a
-// session reads as a single scannable sequence instead of stacked cards.
+// Event list — every event is a card in EXACTLY the sessions-list row layout
+// (visit-list-page.ts): plain flat text at 14px, chip colors only, newest
+// event FIRST. One card per event:
+//   line 1 — head: the event name (semibold, grows) with the action verb at
+//            the right in its funnel color (interaction blue / conversion
+//            gold / muted);
+//   line 2 — the page the event happened on, in the page/path purple — shown
+//            only when the event carries a pathname;
+//   line 3 — dot-separated meta: time HH:MM:SS, locale, app, meta values.
+// A Madrid-day divider appears when the stream crosses into the previous day.
 // ---------------------------------------------------------------------------
 
 // Action verbs worth calling out in color while scanning the funnel.
@@ -143,41 +150,57 @@ const CONVERT_ACTIONS = new Set([
   "Purchase", "Pay", "Checkout", "Upgrade", "Convert",
 ]);
 
-function actionChip(action: string): string {
-  const cls = CONVERT_ACTIONS.has(action)
-    ? "tag-convert"
-    : INTERACT_ACTIONS.has(action)
-      ? "tag-interact"
-      : "tag-muted";
-  return chip(cls, action);
+function actionCls(action: string): string {
+  if (CONVERT_ACTIONS.has(action)) return "convert";
+  if (INTERACT_ACTIONS.has(action)) return "interact";
+  return "muted";
+}
+
+/** Per-event meta as flat text (links stay links — the {v} admin links). */
+function flatMeta(meta: Record<string, string>, registry: ReturnType<typeof asMetaKeysRegistry>): string[] {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(meta)) {
+    const cfg = registry[key];
+    const label = typeof cfg?.label === "string" ? cfg.label : key;
+    const text = `${label}: ${value}`;
+    if (typeof cfg?.link === "string" && cfg.link.includes("{v}")) {
+      const href = cfg.link.replace("{v}", encodeURIComponent(value));
+      parts.push(`<a class="r-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`);
+    } else {
+      parts.push(flat("muted", text));
+    }
+  }
+  return parts;
 }
 
 function renderEvent(e: Event, registry: ReturnType<typeof asMetaKeysRegistry>): string {
-  const meta = coerceMeta(e.meta);
-  const extra: string[] = [];
-  if (e.locale) extra.push(chip("tag-muted", e.locale));
-  if (e.app) extra.push(chip("tag-muted", e.app));
-  if (Object.keys(meta).length > 0) extra.push(renderMetaChips(meta, registry));
-
   const full = `${fmtDayLabel(e.at)}, ${fmtClock(e.at)} · Europe/Madrid`;
+
+  const head = `<div class="r-head"><span class="evt-name">${escapeHtml(e.name)}</span>${flat(actionCls(e.action), e.action)}</div>`;
+  const page = e.path
+    ? `<div class="r-page" title="${escapeHtml(e.path)}">${flat("page", e.path)}</div>`
+    : "";
+
+  const meta: string[] = [
+    `<span class="r-t-muted" title="${escapeHtml(full)}">${fmtClock(e.at)}</span>`,
+  ];
+  if (e.locale) meta.push(flat("muted", e.locale));
+  if (e.app) meta.push(flat("muted", e.app));
+  meta.push(...flatMeta(coerceMeta(e.meta), registry));
+
   return `
-  <div class="evt">
-    <time class="evt-time" datetime="${escapeHtml(e.at.toISOString())}" title="${escapeHtml(full)}">${fmtClock(e.at)}</time>
-    <div class="evt-body">
-      ${pageChip(e.path, e.page)}
-      ${actionChip(e.action)}
-      <span class="evt-name">${escapeHtml(e.name)}</span>
-      ${extra.join("")}
-    </div>
+  <div class="visit-row">
+    ${head}
+    ${page}
+    <div class="r-meta">${meta.join(" · ")}</div>
   </div>`;
 }
 
 function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysRegistry>): string {
   if (events.length === 0) return `<p class="muted">No events recorded.</p>`;
   const rows: string[] = [];
-  // Day dividers appear only when the stream crosses into a new Madrid
-  // calendar day — a single-day session needs no label (the head already
-  // shows the window).
+  // Events are newest-first; day dividers appear when the stream crosses
+  // into a previous Madrid calendar day.
   let prevDay: string | null = null;
   for (const e of events) {
     const day = fmtMadridDay(e.at);
@@ -202,16 +225,16 @@ export function renderVisitDetailPage(
 
   const body = `${renderTopbar(sites, visit.siteId, dayKey, refreshHref)}
 <main class="dashboard">
-  <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to visits</a></p>
+  <div class="crumb-row">
+    <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to visits</a></p>
+    <a class="danger-link" href="/visits/${escapeHtml(visit.id)}/delete?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">Delete session</a>
+  </div>
   ${renderSessionHead(visit, events.length, renderMetaBlock(visit, registry))}
   ${renderRawDetails(visit)}
   <section>
     <h2>Events (${events.length})</h2>
     ${renderEvents(events, registry)}
   </section>
-  <div class="detail-actions">
-    <a class="danger-link" href="/visits/${escapeHtml(visit.id)}/delete?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">Delete session</a>
-  </div>
 </main>`;
   return renderLayout(`Visit ${visit.id}`, body);
 }

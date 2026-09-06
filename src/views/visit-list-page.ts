@@ -1,7 +1,7 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { countryEmoji, countryName, fmtHM } from "./format";
-import { clientKindLabel } from "./tags";
+import { clientKindLabel, flat } from "./tags";
 import type { DaySummary, VisitListItem } from "../lib/visit-queries";
 
 // The row renders as plain text everywhere — no pills. Each value keeps the
@@ -20,11 +20,6 @@ function themeEmoji(theme: string | null): { emoji: string; label: string } | nu
   if (theme === "dark") return { emoji: "🌙", label: "dark" };
   if (theme === "light") return { emoji: "☀️", label: "light" };
   return null;
-}
-
-/** One colored-text segment — chip color, no pill. */
-function t(cls: string, text: string): string {
-  return `<span class="r-t-${cls}">${escapeHtml(text)}</span>`;
 }
 
 export interface VisitListPageData {
@@ -138,25 +133,25 @@ function renderRow(item: VisitListItem, dayKey: string): string {
 
   // Line 2 — the entry address, in the page/path purple, no pill.
   const entryRow = item.firstPage
-    ? `<div class="r-page" title="${escapeHtml(item.firstPage)}">${t("page", item.firstPage)}</div>`
+    ? `<div class="r-page" title="${escapeHtml(item.firstPage)}">${flat("page", item.firstPage)}</div>`
     : "";
 
   // Line 3 — dot-separated colored values; theme is an emoji before HH:MM.
   const theme = themeEmoji(item.theme);
-  const time = `${theme ? `<span class="r-theme" title="${escapeHtml(theme.label)}">${theme.emoji}</span> ` : ""}${t("muted", fmtHM(item.lastAt))}`;
+  const time = `${theme ? `<span class="r-theme" title="${escapeHtml(theme.label)}">${theme.emoji}</span> ` : ""}${flat("muted", fmtHM(item.lastAt))}`;
   const meta: string[] = [time];
-  meta.push(t("count", String(item.eventCount)));
-  if (item.ref) meta.push(t("source", `via ${item.ref}`));
-  else if (item.from) meta.push(t("source", `from ${item.from}`));
+  meta.push(flat("count", String(item.eventCount)));
+  if (item.ref) meta.push(flat("source", `via ${item.ref}`));
+  else if (item.from) meta.push(flat("source", `from ${item.from}`));
   const os = item.os ? OS_LABELS[item.os] : undefined;
-  if (os) meta.push(t("os", os));
-  if (item.device === "tablet") meta.push(t("device", "Tablet"));
-  if (item.lang) meta.push(t("muted", item.lang));
+  if (os) meta.push(flat("os", os));
+  if (item.device === "tablet") meta.push(flat("device", "Tablet"));
+  if (item.lang) meta.push(flat("muted", item.lang));
   const metaRow = `<div class="r-meta">${meta.join(" · ")}</div>`;
 
   // Anonymous sessions get no identity line at all — nothing is written.
   const idHtml = item.email
-    ? `<div class="r-id">${t("email", item.email)}</div>`
+    ? `<div class="r-id">${flat("email", item.email)}</div>`
     : "";
 
   return `

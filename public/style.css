@@ -1,10 +1,11 @@
 /* iq-metrix — one plain stylesheet, no build step, no framework.
  *
- * The two admin surfaces share one visual grammar: compact rows built from
- * colored text pills ("chips"). The sessions list (visit-list-page.ts) shows
- * one row per session; the session detail (visit-detail-page.ts) reuses the
- * exact same row look for its head and renders its event stream as
- * one-chip-line-per-event rows below it.
+ * The admin surfaces share one flat-text grammar: values carry the chip
+ * COLORS (see .tag-* pills on the detail head, and .r-t-* flat text on the
+ * sessions list + event cards) with no pill chrome on the list surfaces.
+ * The sessions list (visit-list-page.ts) renders one row per session; the
+ * session detail (visit-detail-page.ts) reuses the exact same row layout
+ * for its events, newest first.
  */
 
 :root {
@@ -565,15 +566,6 @@ code {
   border: 1px solid rgba(183, 140, 255, 0.36);
 }
 
-/* Page/path chips carry full URL pathnames ("/ru/feature-slug") — cap their
-   width so a long path ellipsizes instead of pushing the rest of the event
-   line (detail) out. The full path rides in the chip's title attribute.
-   (Sessions-list rows override this via .r-page .tag to span the whole
-   line.) */
-.evt-body .tag-page {
-  max-width: min(340px, 70vw);
-}
-
 .tag-interact {
   color: #9cc2ff;
   background: rgba(91, 140, 255, 0.12);
@@ -615,17 +607,25 @@ a.chip:hover {
 
 /* ---------- Visit detail ---------- *
  *
- * Compact session head — the same grid + chip grammar as the sessions-list
- * rows ("Visit list rows" above), so a detail page reads as an expanded
- * list row: location + activity window up top, attribute chips under it,
- * then the identity chip. The verbose id/key/hash rows live in a collapsed
- * native <details> beneath the head, and the events render below as one
- * chip line per event — time-first, per-day-grouped.
+ * Compact session head (kept in the chip grammar): location text + activity
+ * window up top, attribute chips under it, then the identity chip. The
+ * verbose id/key/hash rows live in a collapsed native <details> beneath the
+ * head, and the events below render as cards in the sessions-list layout —
+ * see "Visit detail: event list" further down.
  */
 
 .crumb {
   margin: 0;
   font-size: 13px;
+}
+
+/* The back-crumb row on the visit detail — the delete link sits here, at the
+   top near the session's main info, not at the bottom of the page. */
+.crumb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .session-head {
@@ -678,65 +678,56 @@ details.raw[open] summary {
   margin-bottom: 12px;
 }
 
-/* ---------- Visit detail: event stream ---------- *
+/* ---------- Visit detail: event list ---------- *
  *
- * One row per event, in time order. The clock (HH:MM:SS, Europe/Madrid) is
- * the ordering anchor on the left; page / action / name plus any
- * locale/app/meta chips flow as one wrap-around line next to it, so "which
- * event came after which" reads at a glance instead of stacked cards. A new
- * Madrid calendar day inserts a divider label above that day's first event.
+ * Events render as cards in EXACTLY the sessions-list row layout — the same
+ * .visit-row / .r-head / .r-page / .r-meta grammar, flat text at 14px, chip
+ * colors only — newest event first. One card per event: name + action verb
+ * (in its funnel color) on the head line, the page pathname in purple under
+ * it, then dot-separated meta (HH:MM:SS · locale · app · meta values). A
+ * Madrid-day divider appears between the groups when a session crosses
+ * midnight.
  */
 
 .evt-list {
   display: flex;
   flex-direction: column;
-}
-
-.evt {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 12px;
-  padding: 6px 0;
-}
-
-.evt + .evt {
-  border-top: 1px solid var(--border);
-}
-
-.evt-time {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11.5px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.evt-body {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 7px;
-  min-width: 0;
-}
-
-/* renderMetaChips' .chip rules add their own right/bottom margins — the
- * flex row above supplies the spacing, so zero them inside the stream. */
-.evt-body .chip {
-  margin: 0;
+  gap: 8px;
 }
 
 .evt-name {
-  font-size: 13px;
-  font-weight: 550;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+/* Action-verb funnel colors (flat text, same palette as the old pills). */
+.r-t-interact {
+  color: #9cc2ff;
+}
+
+.r-t-convert {
+  color: #ffd98a;
+}
+
+/* Per-event meta links (e.g. restaurant/topic admin links) — flat text in
+   the accent color, same 14px as the rest of the row. */
+.r-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.r-link:hover {
+  text-decoration: underline;
 }
 
 .evt-day {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 10px 0 3px;
+  margin: 2px 0 0;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -749,13 +740,6 @@ details.raw[open] summary {
   flex: 1;
   height: 1px;
   background: var(--border);
-}
-
-@media (max-width: 720px) {
-  .evt {
-    padding: 5px 0;
-    column-gap: 10px;
-  }
 }
 
 .kv-grid {
@@ -795,21 +779,15 @@ details.raw[open] summary {
   font-size: 13px;
 }
 
-/* ---------- Session delete (detail footer + confirm page) ---------- *
+/* ---------- Session delete (confirm page) ---------- *
  *
- * The detail page ends with a danger-outlined "Delete session" link; it only
- * GETs to the confirm page (no state change). There the session head is
- * re-rendered and a danger POST button is the one control that actually
- * deletes — cancel is a plain link back. Same red accent as .tag-bot/error,
- * so destructive controls read danger at a glance.
+ * The visit detail now carries its danger-outlined "Delete session" link in
+ * the top crumb row; the link only GETs to the confirm page (no state
+ * change). There the session head is re-rendered and a danger POST button
+ * is the one control that actually deletes — cancel is a plain link back.
+ * Same red accent as .tag-bot/error, so destructive controls read danger at
+ * a glance.
  */
-
-.detail-actions {
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-}
 
 a.danger-link {
   display: inline-block;
