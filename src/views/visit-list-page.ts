@@ -1,8 +1,29 @@
 import type { Site } from "@prisma/client";
 import { escapeHtml, renderLayout, renderTopbar } from "./layout";
 import { countryEmoji, countryName, fmtHM } from "./format";
-import { chip, clientKindLabel, deviceChip, entryChip, osChip, sourceChip, themeChip } from "./tags";
+import { clientKindLabel } from "./tags";
 import type { DaySummary, VisitListItem } from "../lib/visit-queries";
+
+// The row renders as plain text everywhere — no pills. Each value keeps the
+// COLOR its chip used to carry (see .r-t-* rules in style.css); the pill
+// background/border is gone.
+const OS_LABELS: Record<string, string> = {
+  windows: "Windows",
+  macos: "macOS",
+  linux: "Linux",
+  ios: "iOS",
+  android: "Android",
+};
+
+const THEME_CLS: Record<string, string> = {
+  dark: "theme-dark",
+  light: "theme-light",
+};
+
+/** One colored-text segment — chip color, no pill. */
+function t(cls: string, text: string): string {
+  return `<span class="r-t-${cls}">${escapeHtml(text)}</span>`;
+}
 
 export interface VisitListPageData {
   sites: Site[];
@@ -77,26 +98,22 @@ function renderSummary(s: DaySummary): string {
 }
 
 // ---------------------------------------------------------------------------
-// Compact visit rows — mixed lines that never wrap (each line truncates
-// instead):
-//   line 1: GEOGRAPHY as plain text — country flag emoji, country name, and
-//           when there is a region or a city a 📍 marker followed by the
-//           region, then a comma-separated city (no commas when those parts
-//           are missing): "🇪🇸 Spain 📍 California, San Francisco".
-//   line 2: the CLIENT, one combined field (verdict + reason flattened into
-//           a single readable line, e.g. "Search engine · Google (IP
-//           verified)") as plain text — humans get no line at all.
-//   line 3: the ENTRY ADDRESS — where the session opened, as one full-width
-//           purple pill ("/", "/ru/feature-slug"; the coarse page label for
-//           pre-path sessions). Truncates to the row width.
-//   line 4: the remaining chips, all on ONE line — last-activity time first
-//           (HH:MM only — the day lives in the header navigator), then the
-//           event count (just the number), then the source ("via <referrer>"
-//           / "from <campaign>"), OS, "Tablet" only when it really is one,
-//           theme, language. Chips shrink & ellipsize before wrapping; time
-//           and count never shrink.
-//   line 5: the email chip — only when the visit is identified; anonymous
-//           sessions get no identity line at all.
+// Compact visit rows — plain text lines, no pills anywhere (only the chip
+// COLORS remain, see .r-t-* in style.css):
+//   line 1: GEOGRAPHY — country flag emoji, country name, then, when there
+//           is a region or a city, "📍 Region, City" (no commas dangle when
+//           a part is missing): "🇪🇸 Spain 📍 California, San Francisco".
+//   line 2: the CLIENT — one combined field (verdict + reason in a single
+//           readable line, "Search engine · Google (IP verified)") in muted
+//           text — humans get no line at all.
+//   line 3: the ENTRY ADDRESS in the page/path purple — where the session
+//           opened ("/", "/ru/feature-slug"; the coarse page label for
+//           pre-path sessions), one truncated line.
+//   line 4: everything else as dot-separated text, each value keeping its
+//           chip color: last-activity HH:MM (the day lives in the header
+//           navigator), the event count, via/from source, OS, "Tablet",
+//           theme, language — wraps if it has to.
+//   line 5: the EMAIL in its green, only when the visit is identified.
 // A session that fired an event in the last ~30 minutes is STILL LIVE and its
 // whole row gets a green border instead of the usual one.
 // The whole row links to the visit detail, carrying the day back so
@@ -105,9 +122,8 @@ function renderSummary(s: DaySummary): string {
 
 function renderRow(item: VisitListItem, dayKey: string): string {
   // Line 1 — geography as one plain text line: flag + country, then "📍
-  // Region, City" when those exist (the comma only appears between region
-  // and city, so neither a missing region nor a missing city leaves one
-  // dangling). The flag never truncates; the text to its right does.
+  // Region, City" when those exist. The flag never truncates; the text next
+  // to it does (full value in the title).
   const flag = countryEmoji(item.country);
   const country = countryName(item.country);
   const placeParts = [item.region, item.city].filter(Boolean);
@@ -120,25 +136,28 @@ function renderRow(item: VisitListItem, dayKey: string): string {
   const kindText = clientKindLabel(item.client, item.clientReason);
   const clientRow = kindText ? `<div class="r-client">${escapeHtml(kindText)}</div>` : "";
 
-  // Line 3 — the entry address, full width.
-  const entryRow = item.firstPage ? `<div class="r-page">${entryChip(item.firstPage)}</div>` : "";
+  // Line 3 — the entry address, in the page/path purple, no pill.
+  const entryRow = item.firstPage
+    ? `<div class="r-page" title="${escapeHtml(item.firstPage)}">${t("page", item.firstPage)}</div>`
+    : "";
 
-  // Line 4 — everything else. Time leads (HH:MM), then the event count as a
-  // bare number, then source chips, OS, device class, theme, language.
-  const chips: string[] = [];
-  chips.push(chip("tag-muted tag-fixed", fmtHM(item.lastAt)));
-  chips.push(chip("tag-count tag-fixed", String(item.eventCount)));
-  if (item.ref) chips.push(sourceChip(null, item.ref));
-  else if (item.from) chips.push(sourceChip(item.from, null));
-  chips.push(osChip(item.os));
-  chips.push(deviceChip(item.device));
-  chips.push(themeChip(item.theme));
-  if (item.lang) chips.push(chip("tag-muted", item.lang));
-  const chipsHtml = chips.join("") ? `<div class="r-tags">${chips.join("")}</div>` : "";
+  // Line 4 — everything else, dot-separated, each piece in its chip color.
+  const meta: string[] = [];
+  meta.push(t("muted", fmtHM(item.lastAt)));
+  meta.push(t("count", String(item.eventCount)));
+  if (item.ref) meta.push(t("source", `via ${item.ref}`));
+  else if (item.from) meta.push(t("source", `from ${item.from}`));
+  const os = item.os ? OS_LABELS[item.os] : undefined;
+  if (os) meta.push(t("os", os));
+  if (item.device === "tablet") meta.push(t("device", "Tablet"));
+  const themeCls = item.theme ? THEME_CLS[item.theme] : undefined;
+  if (themeCls) meta.push(t(themeCls, item.theme!));
+  if (item.lang) meta.push(t("muted", item.lang));
+  const metaRow = meta.length > 0 ? `<div class="r-meta">${meta.join(" · ")}</div>` : "";
 
   // Anonymous sessions get no identity line at all — nothing is written.
   const idHtml = item.email
-    ? `<div class="r-id">${chip("tag-email", item.email)}</div>`
+    ? `<div class="r-id">${t("email", item.email)}</div>`
     : "";
 
   return `
@@ -146,7 +165,7 @@ function renderRow(item: VisitListItem, dayKey: string): string {
     ${geoRow}
     ${clientRow}
     ${entryRow}
-    ${chipsHtml}
+    ${metaRow}
     ${idHtml}
   </a>`;
 }

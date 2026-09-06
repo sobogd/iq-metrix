@@ -257,19 +257,17 @@ code {
 
 /* ---------- Visit list rows ---------- *
  *
- * One compact row per session — chip lines that never wrap (each line
- * truncates its chips instead):
- *   line 1 — geography chips: country (flag + name), region, city. Every
- *            chip is at least 20% of the line wide and grows to share it;
- *            too-long values ellipsize (title = full).
- *   line 2 — the entry address: one full-width purple pill.
- *   line 3 — the remaining chips on ONE line: last-activity HH:MM (the day
- *            lives in the header navigator, so no date), the event count as
- *            a bare number, then the source, OS, "Tablet", theme, language —
- *            chips shrink & ellipsize instead of wrapping.
- *   line 4 — the email chip, only when the visit is identified.
- * The whole row is one link to the visit detail page. (The session-detail
- * head keeps the older text-location grammar — see "Visit detail".)
+ * One compact row per session — plain text, no pills anywhere. Chip COLORS
+ * are kept (the .r-t-* rules below mirror the .tag-* palette) while the pill
+ * backgrounds/borders are dropped:
+ *   line 1 — geography: flag, country, 📍 region, city (text color);
+ *   line 2 — the client as one combined field, muted (humans get no line);
+ *   line 3 — the entry address in the page/path purple, one truncated line;
+ *   line 4 — dot-separated values, each in its chip color: last-activity
+ *            HH:MM, event count, via/from, OS, "Tablet", theme, language
+ *            (wraps if it has to);
+ *   line 5 — the email in its green, only when the visit is identified.
+ * Live rows get a green border. The whole row links to the visit detail.
  */
 
 .visits {
@@ -281,7 +279,7 @@ code {
 .visit-row {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -303,6 +301,48 @@ code {
   box-shadow: 0 0 0 1px rgba(126, 224, 195, 0.22);
 }
 
+/* Flat text segments — each value keeps the color its chip used to carry
+   (same palette as .tag-* above/below), with no pill look. */
+.r-t-page {
+  color: #c9adff;
+  font-weight: 600;
+}
+
+.r-t-source {
+  color: #93eccf;
+}
+
+.r-t-os {
+  color: #c9adff;
+}
+
+.r-t-device {
+  color: #9cc2ff;
+}
+
+.r-t-count {
+  color: var(--accent-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.r-t-theme-dark {
+  color: #b6c2de;
+}
+
+.r-t-theme-light {
+  color: #ffd98a;
+}
+
+.r-t-muted {
+  color: var(--muted);
+}
+
+.r-t-email {
+  color: #b3ffe7;
+  font-weight: 600;
+}
+
 /* Row 1 — geography as one plain text line: flag + country, then "📍 Region,
    City". Text is chip-sized (11.5px) like every other value on the row. The
    flag never truncates; the text next to it ellipsizes when the line is
@@ -312,7 +352,7 @@ code {
   align-items: baseline;
   gap: 7px;
   min-width: 0;
-  font-size: 11.5px; /* same size as .tag chips */
+  font-size: 11.5px; /* same size as chips */
 }
 
 .r-geo-flag {
@@ -342,42 +382,29 @@ code {
   text-overflow: ellipsis;
 }
 
-/* Row 2 — entry address, one full-width pill. */
+/* Row 3 — the entry address: purple text, no pill, one truncated line. */
 .r-page {
   min-width: 0;
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.r-page .tag {
-  width: 100%;
-  max-width: none;
-  justify-content: flex-start;
-  font-weight: 600;
-}
-
-/* Row 3 — the rest of the chips on ONE line: chips shrink (and ellipsize)
-   once the line is full instead of wrapping. Time and the event count carry
-   .tag-fixed and never shrink. */
-.r-tags {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+/* Row 4 — dot-separated colored values; a plain text line, so it wraps
+   instead of hiding anything. */
+.r-meta {
   min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.r-tags .tag {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.r-tags .tag-fixed {
-  flex: 0 0 auto;
-}
-
-/* Row 4 — the identity chip, only for identified sessions. */
+/* Row 5 — the identity, only for identified sessions. */
 .r-id {
-  display: flex;
-  align-items: center;
   min-width: 0;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
 }
 
 /* Session-detail head — location text (left) + activity window and event

@@ -162,9 +162,3 @@ export function pageChip(path: string | null, label: string): string {
   const title = path ? `${label} · ${path}` : label;
   return `<span class="tag tag-page" title="${escapeHtml(title)}">${escapeHtml(shown)}</span>`;
 }
-
-/** Entry-page pill for a sessions-list row — the visit's first page, already
- *  reduced to "path ?? label" by the list query (visit-queries.ts). */
-export function entryChip(page: string): string {
-  return `<span class="tag tag-page" title="${escapeHtml(page)}">${escapeHtml(page)}</span>`;
-}
