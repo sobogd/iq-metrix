@@ -208,7 +208,7 @@ The visit list is the raw drill-down for that day — **every** session that
 was active during it, newest-active first, **no pagination** (the list IS the
 day). One compact row per session, rendered as **plain text — no chips/pills
 anywhere**; every value simply keeps the *color* its chip used to carry, and
-all text is the same chip size:
+all text renders at 14px:
 the first line is a head row — the geography on the left (country flag
 emoji, country name, then, when there is a region or a city, a 📍 marker
 followed by the region and a comma-separated city: `🇪🇸 Spain 📍 California,
