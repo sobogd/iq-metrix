@@ -172,8 +172,8 @@ function kvRow(label: string, value: string): string {
   return `<div class="kv"><span class="k">${escapeHtml(label)}</span><span class="v">${value}</span></div>`;
 }
 
-/** The whole session's information as one collapsed expander — one field per
- *  row, so the page reads: back/delete icons, the "Session info" disclosure,
+/** The whole session's information as one always-visible block — one field
+ *  per row, so the page reads: back/delete icons, the Session info block,
  *  then the events list as the main content. */
 function renderSessionInfo(
   visit: Visit,
@@ -215,10 +215,11 @@ function renderSessionInfo(
       ? `<div class="meta-block"><span class="k">Meta snapshot</span><div>${renderMetaChips(meta, registry)}</div></div>`
       : "";
 
-  return `<details class="raw session-info"><summary>Session info</summary>
+  return `<section class="session-info">
+  <h2>Session info</h2>
   <div class="kv-col">${rows.join("")}</div>
   ${metaRow}
-</details>`;
+</section>`;
 }
 
 function renderEvents(events: Event[], registry: ReturnType<typeof asMetaKeysRegistry>): string {

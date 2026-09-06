@@ -246,11 +246,11 @@ returns to the same day.
 Visit detail is a separate page (not a `<dialog>` — that would need client JS).
 Its top tools row holds two icon buttons: ⬅️ back to the visits list (keeping
 the selected day) and, on the right, 🗑️ delete. Everything known about the
-session lives in one collapsed **"Session info"** expander — one field per
+session sits in an always-visible **Session info** block — one field per
 row (country/region/city, first/last seen, events, app, OS, language, theme,
 referrer/from, email, client as the combined kind+reason line, duration,
 merge count, ids/hashes, meta snapshot) — so the page reads: tools, the
-disclosure, then the event list as the main content. Below it, every event
+block, then the event list as the main content. Below it, every event
 is a card in exactly the sessions-list layout
 (flat text at 14px, chip colors only, no pills), **newest first**: the head
 line carries the event name with the action verb in its funnel color, the

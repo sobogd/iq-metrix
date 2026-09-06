@@ -773,13 +773,30 @@ details.raw[open] summary {
   overflow-wrap: anywhere;
 }
 
-/* "Session info" expander on the visit detail — the whole session as one
-   field per row, stacked. */
 .kv-col {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-top: 12px;
+}
+
+/* "Session info" block on the visit detail — the whole session as one field
+   per row, always visible. */
+.session-info {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-info .kv-col {
+  padding-top: 0;
+}
+
+.session-info .meta-block {
+  margin-top: 0;
 }
 
 .meta-block {
