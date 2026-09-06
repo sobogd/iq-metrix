@@ -50,11 +50,12 @@ a {
 
 /* ---------- Top bar (signed-in pages) ---------- *
  *
- * One row even on a phone: logo (emoji) + the selected company id in bold on
- * the left (truncating), then borderless emoji buttons on the right —
- * refresh 🔄, calendar 📅 (native date picker), company 🏢 (native select),
- * sign-out 🚪 (native confirm before the POST). The ghost controls are real
- * native inputs laid invisibly over their emoji faces.
+ * One row even on a phone: the selected company id in bold (truncating),
+ * then the 🏢 company icon (native select over it) and the 📅 date control
+ * with the short day text ("7.10.24", native date input over it), then the
+ * borderless emoji action buttons on the right — refresh 🔄 and sign-out 🚪
+ * (native confirm before the POST). The ghost controls are real native
+ * inputs laid invisibly over their emoji/text.
  */
 
 .topbar {
@@ -68,22 +69,17 @@ a {
 .topbar-inner {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   padding: 8px 16px;
   max-width: var(--max-width);
   margin: 0 auto;
 }
 
-.logo {
-  flex: 0 0 auto;
-  font-size: 22px;
-  line-height: 1;
-  text-decoration: none;
-}
-
-/* The selected company id — bold, truncating so the row never overflows. */
+/* The selected company id — bold, truncating so the row never overflows. It
+   does not grow: the 🏢/📅 controls sit right next to it and the action
+   buttons stay pinned to the right edge. */
 .topbar-id {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-weight: 700;
   font-size: 14px;
@@ -91,6 +87,32 @@ a {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The date control — 📅 emoji + the short day text ("7.10.24"), with the
+   native date input over the whole pill. */
+.tb-date {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.tb-date:hover {
+  background: var(--panel-2);
+}
+
+.tb-day {
+  pointer-events: none;
 }
 
 .topbar-inner form {
@@ -946,16 +968,6 @@ button.delete-btn:hover {
   background: rgba(255, 107, 107, 0.1);
   border-color: var(--danger);
   filter: none;
-}
-
-/* Quiet caption above the stats saying which Madrid day is showing — the day
-   is picked in the header's 📅 native date control, no arrows/synonyms. */
-.list-day {
-  margin: 0;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
 }
 
 /* ---------- Summary strip (numeric cards, no charts) ---------- */

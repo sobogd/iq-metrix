@@ -179,19 +179,20 @@ The core of the service, ported from the two references and made multi-tenant:
 ## Admin UI
 
 Server-rendered HTML, mobile-first. A sticky topbar holds everything on one
-row even on a phone: the logo emoji (📊) with the **selected company's id in
-bold** next to it (truncating), and on the right a row of **borderless emoji
-buttons** — refresh (🔄, a link to the current request URL), calendar (📅, a
-real native `<input type="date">` laid invisibly over the emoji, so clicking
-opens the browser's own date picker), company (🏢, a native `<select>` of the
-site ids — iq-rest / iq-translate / iq-mermaid — keeping the selected day)
-and sign-out (🚪, a POST confirmed by the browser's native
-`confirm()`). Those one-line inline handlers are the app's only client JS.
+row even on a phone: the **selected company's id in bold** (truncating),
+then the 🏢 company icon (a native `<select>` of the site ids — iq-rest /
+iq-translate / iq-mermaid — laid invisibly over it) and the 📅 date control
+showing the selected day as short text (`7.10.24`, with a real native
+`<input type="date">` over it, so clicking opens the browser's own date
+picker), and on the right two **borderless emoji buttons** — refresh (🔄, a
+link to the current request URL) and sign-out (🚪, a POST confirmed by the
+browser's native `confirm()`). Those one-line inline handlers are the app's
+only client JS.
 
 The dashboard is deliberately chart-free, filter-free and ranking-free —
-one **Madrid calendar day per page**, picked with the 📅 calendar in the
-header (`?day=YYYY-MM-DD`, default today); a quiet date caption above the
-stats says which day is showing (no arrows, no "Today/Yesterday"). Under
+one **Madrid calendar day per page**, picked with the 📅 control in the
+header (`?day=YYYY-MM-DD`, default today), shown there as `7.10.24` and never
+duplicated in the page body. Under
 that day,
 the numeric summary strip counts **visits** (sessions with any activity
 inside the day — the window overlaps it, so a session that fired on both
@@ -199,8 +200,7 @@ sides of midnight appears on both days' lists), **events** (`at` inside the
 day) and **distinct identified emails** — all over 00:00–23:59 Europe/Madrid
 (the same clock the salt rotation is anchored to). There is no live number
 in the strip — liveness is per-row (see below). The cards
-sit in one row even on a phone; the labels carry no day — the caption owns
-it. Everything is computed in `src/lib/visit-queries.ts` with the day bounds
+sit in one row even on a phone. Everything is computed in `src/lib/visit-queries.ts` with the day bounds
 from `src/lib/madrid.ts`; every timestamp in the
 admin (list rows, detail page, events table) renders on a Europe/Madrid
 clock regardless of the server's own timezone (`src/views/format.ts`).

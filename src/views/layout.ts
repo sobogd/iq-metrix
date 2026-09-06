@@ -10,37 +10,32 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** One borderless emoji header button. Calendar / company mount a NATIVE
- *  control (real <input type="date"> / <select>) invisibly over the emoji,
- *  so clicking the emoji opens the browser's own date picker / dropdown —
- *  no custom chrome. The three one-line inline handlers on those controls
- *  (and on logout's confirm) are the app's only client JS. */
-function tbButton(face: string, label: string, controlBody: string): string {
-  return `
-    <span class="tb-ico" title="${label}" aria-label="${label}">
-      ${controlBody}
-      <span class="tb-face" aria-hidden="true">${face}</span>
-    </span>`;
-}
-
-/** Shared page header — left: the logo emoji + selected company's id in bold
- *  (truncating); clicking the logo or the id opens the NATIVE company select
- *  (the <select> is laid invisibly over the whole left block). Right: a row
- *  of borderless emoji buttons — refresh, calendar (native date picker),
- *  sign-out (with a native confirm). The selected Madrid day (`dayKey`) is
- *  kept when changing company or picking a date. */
+/** Shared page header — left: the logo emoji (not interactive), the selected
+ *  company's id in bold (truncating), then the 🏢 company icon (a native
+ *  <select> laid invisibly over it) and the 📅 date control showing the day
+ *  as short text ("7.10.24", native <input type="date"> over it) — the
+ *  emojis separate the fields, no dot. Right: borderless emoji buttons —
+ *  refresh, sign-out (with a native confirm). The day is never duplicated in
+ *  the page body — the header owns it. */
 export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: string, refreshHref = "/"): string {
   const siteId = currentSiteId ?? sites[0]?.id ?? "";
   const day = (dayKey ?? madridDayKey(new Date())) as string;
+  const dayPrefix = escapeHtml(`/?site=${siteId}&day=`);
 
   const refresh = `<a class="tb-ico" href="${escapeHtml(refreshHref)}" title="Refresh" aria-label="Refresh"><span class="tb-face" aria-hidden="true">🔄</span></a>`;
+  const logout = `<form method="post" action="/logout" onsubmit="return confirm('Sign out?')"><button type="submit" class="tb-ico" title="Sign out" aria-label="Sign out"><span class="tb-face" aria-hidden="true">🚪</span></button></form>`;
 
-  const dayPrefix = escapeHtml(`/?site=${siteId}&day=`);
-  const calendar = tbButton(
-    "📅",
-    "Pick a date",
-    `<input type="date" class="tb-ghost" aria-label="Pick a date" value="${escapeHtml(day)}" onchange="location.href='${dayPrefix}'+encodeURIComponent(this.value)" />`,
-  );
+  if (sites.length === 0) {
+    return `
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-actions">
+      ${refresh}
+      ${logout}
+    </div>
+  </div>
+</header>`;
+  }
 
   const options = sites
     .map(
@@ -49,25 +44,28 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
     )
     .join("");
 
-  // Logo + id block: the native company <select> sits invisibly over it, so
-  // clicking the emoji or the bold id opens the picker.
-  const company =
-    sites.length > 0
-      ? `<span class="tb-company" title="Pick a company">
-  <select class="tb-ghost" aria-label="Pick a company" onchange="location.href=this.value">${options}</select>
-  <span class="logo">📊</span>
-  <span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>
-</span>`
-      : `<span class="logo">📊</span>`;
+  // Short day text, "7.10.24" (no padding).
+  const [y, m, d] = day.split("-").map(Number);
+  const shortDate = `${d}.${m}.${String(y).slice(2)}`;
 
-  const logout = `<form method="post" action="/logout" onsubmit="return confirm('Sign out?')"><button type="submit" class="tb-ico" title="Sign out" aria-label="Sign out"><span class="tb-face" aria-hidden="true">🚪</span></button></form>`;
+  const companyIcon = `<span class="tb-ico" title="Pick a company" aria-label="Pick a company">
+  <select class="tb-ghost" aria-label="Pick a company" onchange="location.href=this.value">${options}</select>
+  <span class="tb-face" aria-hidden="true">🏢</span>
+</span>`;
+
+  const dateControl = `<span class="tb-date" title="Pick a date">
+  <input type="date" class="tb-ghost" aria-label="Pick a date" value="${escapeHtml(day)}" onchange="location.href='${dayPrefix}'+encodeURIComponent(this.value)" />
+  <span class="tb-face" aria-hidden="true">📅</span>
+  <span class="tb-day">${escapeHtml(shortDate)}</span>
+</span>`;
 
   return `
 <header class="topbar">
   <div class="topbar-inner">
-    ${company}
+    <span class="topbar-id" title="${escapeHtml(siteId)}">${escapeHtml(siteId)}</span>
+    ${companyIcon}
+    ${dateControl}
     <div class="topbar-actions">
-      ${calendar}
       ${refresh}
       ${logout}
     </div>

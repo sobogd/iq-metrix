@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
 import { getDaySummary, listSites, listVisits, markVisitsSeen } from "../lib/visit-queries";
 import { madridBoundsFromKey, madridDayKey } from "../lib/madrid";
-import { fmtDayHeading } from "../views/format";
 import { renderNoSitesPage, renderVisitListPage } from "../views/visit-list-page";
 
 function str(v: unknown): string {
@@ -53,7 +52,6 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
         currentSite,
         items,
         dayKey,
-        heading: fmtDayHeading(dayKey, now),
         summary,
         refreshHref: request.url,
       }),

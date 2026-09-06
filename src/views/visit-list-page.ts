@@ -27,11 +27,9 @@ export interface VisitListPageData {
   currentSite: Site;
   items: VisitListItem[];
   /** Selected Madrid day as "YYYY-MM-DD" — the day the stats and list show.
-   *  Picked via the header's 📅 native date control. */
+   *  Picked via the header's 📅 date control; the header shows it as short
+   *  text ("7.10.24"), so the page body never repeats the date. */
   dayKey: string;
-  /** The selected day as a plain date ("Fri, 04 Sep" + year when not the
-   *  current one) — a quiet caption above the stats. */
-  heading: string;
   summary: DaySummary;
   /** Current request URL — the topbar's refresh icon links here to reload. */
   refreshHref: string;
@@ -153,7 +151,6 @@ function renderTable(items: VisitListItem[], dayKey: string): string {
 export function renderVisitListPage(data: VisitListPageData): string {
   const body = `${renderTopbar(data.sites, data.currentSite.id, data.dayKey, data.refreshHref)}
 <main class="dashboard">
-  <p class="list-day">${escapeHtml(data.heading)}</p>
   ${renderSummary(data.summary)}
   ${renderTable(data.items, data.dayKey)}
 </main>`;
