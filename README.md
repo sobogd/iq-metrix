@@ -42,7 +42,7 @@ ecosystem.config.js              pm2 process definition
 | `Site` | One row per source product (`iq-rest`, `iq-translate`, `iq-mermaid`). Holds `domain` and the registry of allowed `meta` keys (`metaKeys`). |
 | `AnalyticsSalt` | Singleton-per-site (`id = "current"`) holding the active hash salt. Rotated daily at 04:00 Europe/Madrid. |
 | `Visit` | One row = one **visit**: a device hash plus an identity, cut after 30 minutes of silence. Multi-tenant (`siteId`). |
-| `Event` | Minimal event rows (page/action/name triple + optional concrete `path`); device/geo/source live on the visit. |
+| `Event` | Minimal event rows (page/action/name triple + optional concrete `path`, plus a `seen` flag backing the list's green "new" dot); device/geo/source live on the visit. |
 
 Key design decisions (vs. the two reference pipelines this was ported from):
 
@@ -209,30 +209,34 @@ was active during it, newest-active first, **no pagination** (the list IS the
 day). One compact row per session, rendered as **plain text — no chips/pills
 anywhere**; every value simply keeps the *color* its chip used to carry, and
 all text is the same chip size:
-the first line is the geography — country flag emoji, country
-name, then, when there is a region or a city, a 📍 marker followed by the
-region and a comma-separated city (`🇪🇸 Spain 📍 California, San Francisco`;
-no commas dangle when either part is missing); the second line is the
-**client** as one combined field — verdict and reason flattened into a single
-readable line (`Search engine · Google`, `Search engine · Google (IP
-verified)`, `AI crawler · OpenAI GPTBot`, `Bot · no browser markers`, `Link
-preview · X (Twitter)`, …) in muted text above the address, shown only for
-non-human traffic; the third line is the
+the first line is a head row — the geography on the left (country flag
+emoji, country name, then, when there is a region or a city, a 📍 marker
+followed by the region and a comma-separated city: `🇪🇸 Spain 📍 California,
+San Francisco`; no commas dangle when either part is missing); on the right,
+for non-human traffic, the **client** as one combined field in muted text
+(`Search engine · Google`, `Search engine · Google (IP verified)`, `AI
+crawler · OpenAI GPTBot`, `Bot · no browser markers`, `Link preview · X
+(Twitter)`, …), and a green 🟢 "new" dot when the session has events the
+admin has not seen yet (on narrow screens the client drops to its own line
+under the geography); the second line is the
 **entry address** — where the session opened, as the concrete pathname in the
 page/path purple (`/`, `/ru/feature-slug`) — it appears only when the visit
 recorded a pathname, so sessions ingested before path capture get no address
-line at all; the fourth line is dot-separated (`·`) colored text — last-activity
-time as `HH:MM` only (the selected day lives in the header, so no date is
-shown), the event count as the bare number, then the source (`via
-<referrer>` or `from <campaign>`, green), OS (Windows/macOS/iOS/Android —
-the device form factor is implied), `Tablet` only when the visit really came
-from a tablet, theme and language, each in its chip color; the fifth line
-appears only for identified sessions and carries the email in its green —
-anonymous rows get no identity line at all. No app/landing label is shown,
-no duration value (the window length still lives on the detail page).
-A session whose last event falls within the last ~30 minutes is still live
-and its whole row is highlighted with a green border — the modern stand-in
-for the removed "Live" counter. All
+line at all; the third line is dot-separated (`·`) colored text — the theme
+as an emoji (🌙 dark / ☀️ light) right before the last-activity time as
+`HH:MM` only (the selected day lives in the header, so no date is shown),
+then the event count as the bare number, the source (`via <referrer>` or
+`from <campaign>`, green), OS (Windows/macOS/iOS/Android — the device form
+factor is implied), `Tablet` only when the visit really came from a tablet,
+and language, each in its chip color; the fourth line appears only for
+identified sessions and carries the email in its green — anonymous rows get
+no identity line at all. No app/landing label is shown, no duration value
+(the window length still lives on the detail page).
+The green dot is the "new/unseen" signal, backed by `Event.seen`: events
+start unseen at ingest; the moment the sessions list (or the visit detail)
+returns a session it marks that session's events as seen, so a session shows
+its 🟢 on the first load after its events arrived and loses it from the next
+load — until genuinely new events land. All
 traffic is still stored and listed — human, search-engine, AI-agent
 and other-bot visits alike — with no lens to hide any of it. The whole
 row links to the visit detail, carrying the selected day along

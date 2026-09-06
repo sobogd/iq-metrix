@@ -13,11 +13,11 @@ import { prisma } from "../db";
 // yesterday 23:55 and kept firing until 00:05 is on yesterday's list AND
 // today's, which is exactly what "everything that happened that day" wants.
 
-// "Live" is a row-level flag now, not a summary metric: a session whose last
-// event sits inside this window is still ongoing (the same 30 minutes the
-// visit-resolver uses as its idle cutoff), and the sessions list highlights
-// it with a green border. Past-day views simply never have such rows.
-const LIVE_RECENT_MS = 30 * 60_000;
+// "New" is a row-level flag: the visit has ≥ 1 event the admin has not seen
+// yet (Event.seen = false). The sessions list marks the events of every
+// session it returns as seen right after the SELECT (markVisitsSeen), so a
+// session's green dot shows on the first load after its events arrived and
+// clears on the next — until genuinely new events land.
 
 export interface VisitListItem {
   id: string;
@@ -53,9 +53,9 @@ export interface VisitListItem {
   firstPage: string | null;
   /** Last page of the visit, as its pathname — null for pre-path sessions. */
   lastPage: string | null;
-  /** True when the session saw an event within the last ~30 minutes — it is
-   *  still "live" and the list highlights the row with a green border. */
-  live: boolean;
+  /** True when the visit has events the admin has not seen yet (Event.seen =
+   *  false) — the row shows the green "new" dot. */
+  new: boolean;
 }
 
 export async function listSites(): Promise<Site[]> {
@@ -68,16 +68,19 @@ export async function listSites(): Promise<Site[]> {
  *  the day bounds keep the scan on the (siteId, lastAt) index.
  *
  *  Each row is enriched with event/page aggregates via a LATERAL join — one
- *  extra lookup per row, kept cheap by the Event `(visitId, at)` index. */
-export async function listVisits(siteId: string, start: Date, end: Date, now: Date): Promise<VisitListItem[]> {
-  const liveSince = new Date(now.getTime() - LIVE_RECENT_MS);
+ *  extra lookup per row, kept cheap by the Event `(visitId, at)` index. The
+ *  `new` flag is an EXISTS over the same index for any unseen event. */
+export async function listVisits(siteId: string, start: Date, end: Date): Promise<VisitListItem[]> {
   return prisma.$queryRaw<VisitListItem[]>`
     SELECT
       v.id, v."siteId", v."firstAt", v."lastAt", v.device, v.os,
       v.country, v.region, v.city, v.lang, v.email, v.theme, v.from, v.ref, v.app,
       v."client", v."clientReason", v."meta", v."mergeCount",
       e."eventCount", e."pageCount", e."firstPage", e."lastPage",
-      v."lastAt" >= ${liveSince} AS live
+      EXISTS (
+        SELECT 1 FROM "Event" ev
+        WHERE ev."visitId" = v.id AND ev."seen" = false
+      ) AS "new"
     FROM "Visit" v
     LEFT JOIN LATERAL (
       SELECT count(*)::int AS "eventCount",
@@ -92,6 +95,23 @@ export async function listVisits(siteId: string, start: Date, end: Date, now: Da
       AND v."lastAt" >= ${start}
     ORDER BY v."lastAt" DESC
   `;
+}
+
+/** Mark a session's events as seen — called after the sessions list returned
+ *  the session (its whole event set counts as displayed, so viewing a session
+ *  anywhere acknowledges all of it). */
+export async function markVisitsSeen(visitIds: string[]): Promise<void> {
+  if (visitIds.length === 0) return;
+  await prisma.event.updateMany({
+    where: { visitId: { in: visitIds }, seen: false },
+    data: { seen: true },
+  });
+}
+
+/** Mark one session's events as seen — after the visit-detail page rendered
+ *  them (viewing the session directly acknowledges it too). */
+export async function markVisitSeen(visitId: string): Promise<void> {
+  await prisma.event.updateMany({ where: { visitId, seen: false }, data: { seen: true } });
 }
 
 export async function getVisitDetail(id: string): Promise<{ visit: Visit; events: Event[] } | null> {

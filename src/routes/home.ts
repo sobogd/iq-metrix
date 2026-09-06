@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
-import { getDaySummary, listSites, listVisits } from "../lib/visit-queries";
+import { getDaySummary, listSites, listVisits, markVisitsSeen } from "../lib/visit-queries";
 import { madridBoundsFromKey, madridDayKey, shiftMadridDay } from "../lib/madrid";
 import { fmtDayHeading } from "../views/format";
 import { renderNoSitesPage, renderVisitListPage } from "../views/visit-list-page";
@@ -11,10 +11,10 @@ function str(v: unknown): string {
 
 /** GET / — one Madrid calendar day, chosen in the header's date navigator
  *  (?day=YYYY-MM-DD, default today): the summary strip counts that day
- *  (Visits/Events/Identified — there is no live number), and the list below
- *  it is every session that had activity during it — no pagination, the
- *  list IS the day, and sessions with an event in the last ~30 minutes are
- *  highlighted as live with a green border. The only query knobs left are
+ *  (Visits/Events/Identified), and the list below it is every session that
+ *  had activity during it — no pagination, the list IS the day. A session
+ *  whose events the admin has not seen yet shows a green "new" dot; the list
+ *  marks what it returns as seen (Event.seen). The only query knobs left are
  *  the topbar site switch (which keeps the day) and the arrows/heading of
  *  the navigator. */
 export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
@@ -39,9 +39,14 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
     const { start, end } = madridBoundsFromKey(dayKey)!;
 
     const [items, summary] = await Promise.all([
-      listVisits(currentSite.id, start, end, now),
+      listVisits(currentSite.id, start, end),
       getDaySummary(currentSite.id, start, end),
     ]);
+
+    // Everything the list just returned is now "seen": the green dots in the
+    // response reflect the PRE-update state, so a session shows its dot on
+    // the first load after its events arrived and loses it from the next.
+    await markVisitsSeen(items.map((i) => i.id));
 
     return reply.send(
       renderVisitListPage({

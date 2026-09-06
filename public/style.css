@@ -260,14 +260,17 @@ code {
  * One compact row per session — plain text, no pills anywhere. Chip COLORS
  * are kept (the .r-t-* rules below mirror the .tag-* palette) while the pill
  * backgrounds/borders are dropped:
- *   line 1 — geography: flag, country, 📍 region, city (text color);
- *   line 2 — the client as one combined field, muted (humans get no line);
- *   line 3 — the entry address in the page/path purple, one truncated line;
- *   line 4 — dot-separated values, each in its chip color: last-activity
- *            HH:MM, event count, via/from, OS, "Tablet", theme, language
- *            (wraps if it has to);
- *   line 5 — the email in its green, only when the visit is identified.
- * Live rows get a green border. The whole row links to the visit detail.
+ *   line 1 — a head row: geography on the left; on the right the client as
+ *            one combined field (muted, non-human only) and the green "new"
+ *            dot for sessions with unseen events; on narrow screens the
+ *            client drops to its own line under the geography;
+ *   line 2 — the entry address in the page/path purple, one truncated line
+ *            (only when the visit recorded a pathname);
+ *   line 3 — dot-separated values, each in its chip color: theme emoji
+ *            (🌙/☀️) right before last-activity HH:MM, then the event count,
+ *            via/from, OS, "Tablet", language — wraps if it has to;
+ *   line 4 — the email in its green, only when the visit is identified.
+ * The whole row links to the visit detail.
  */
 
 .visits {
@@ -290,15 +293,6 @@ code {
 
 .visit-row:hover {
   border-color: var(--accent);
-}
-
-/* A session that fired an event in the last ~30 minutes is still live — its
-   whole row carries a green border (and a soft outer ring) so it reads as
-   "someone is on the site right now" while scanning the list. */
-.visit-row-live,
-.visit-row-live:hover {
-  border-color: rgba(126, 224, 195, 0.7);
-  box-shadow: 0 0 0 1px rgba(126, 224, 195, 0.22);
 }
 
 /* Flat text segments — each value keeps the color its chip used to carry
@@ -326,14 +320,6 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
-.r-t-theme-dark {
-  color: #b6c2de;
-}
-
-.r-t-theme-light {
-  color: #ffd98a;
-}
-
 .r-t-muted {
   color: var(--muted);
 }
@@ -343,11 +329,18 @@ code {
   font-weight: 600;
 }
 
-/* Row 1 — geography as one plain text line: flag + country, then "📍 Region,
-   City". Text is chip-sized (11.5px) like every other value on the row. The
-   flag never truncates; the text next to it ellipsizes when the line is
-   full (full value in the title). */
+/* Row 1 — the head row. The geography takes the free space (and truncates);
+   the client and the green dot sit at the right edge. On narrow screens the
+   client is reordered onto its own full-width line under the geography. */
+.r-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .r-geo {
+  flex: 1 1 auto;
   display: flex;
   align-items: baseline;
   gap: 7px;
@@ -371,9 +364,11 @@ code {
   overflow-wrap: normal;
 }
 
-/* Row 2 — the client, one combined plain-text field above the entry
-   address. Chip-sized, muted, truncating to one line. */
+/* The client field — one combined plain-text line next to the new dot. */
 .r-client {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
   font-size: 11.5px;
   line-height: 1.35;
   color: var(--muted);
@@ -382,7 +377,14 @@ code {
   text-overflow: ellipsis;
 }
 
-/* Row 3 — the entry address: purple text, no pill, one truncated line. */
+/* The green "new" dot — the row's first line, at the far right. */
+.r-dot {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Line 2 — the entry address: purple text, no pill, one truncated line. */
 .r-page {
   min-width: 0;
   font-size: 11.5px;
@@ -391,8 +393,8 @@ code {
   text-overflow: ellipsis;
 }
 
-/* Row 4 — dot-separated colored values; a plain text line, so it wraps
-   instead of hiding anything. */
+/* Line 3 — dot-separated colored values; a plain text line, so it wraps
+   instead of hiding anything. The theme emoji sits right before HH:MM. */
 .r-meta {
   min-width: 0;
   font-size: 11.5px;
@@ -400,16 +402,44 @@ code {
   overflow-wrap: anywhere;
 }
 
-/* Row 5 — the identity, only for identified sessions. */
+.r-theme {
+  font-size: 12px;
+}
+
+/* Line 4 — the identity, only for identified sessions. */
 .r-id {
   min-width: 0;
   font-size: 11.5px;
   overflow-wrap: anywhere;
 }
 
+/* Narrow screens: the client becomes its own full-width line under the
+   geography (the dot stays on the first line, at the right). */
+@media (max-width: 720px) {
+  .r-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .r-geo {
+    flex: 1 1 auto;
+  }
+
+  .r-dot {
+    order: 2;
+  }
+
+  .r-client {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+    margin-left: 0;
+  }
+}
+
 /* Session-detail head — location text (left) + activity window and event
    count (right). These classes are no longer used by sessions-list rows
-   (those moved to the chip grammar above), only by the detail head. */
+   (those moved to the flat-text grammar above), only by the detail head. */
 .visit-geo {
   display: flex;
   align-items: baseline;

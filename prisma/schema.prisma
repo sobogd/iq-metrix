@@ -124,6 +124,14 @@ model Event {
   // legacy events (and for server-fired events that never had a page).
   path   String?
 
+  // Admin "viewed" flag: set to true the moment the event has been returned
+  // by the sessions list (or detail) SELECT — the admin saw it. A visit with
+  // any unseen event gets the green "new" dot in the sessions list; once the
+  // list query has returned the session it marks its events seen, so the dot
+  // clears on the next load until genuinely new events arrive. Ingested
+  // events start unseen.
+  seen   Boolean @default(false)
+
   locale String? // locale the page was rendered in, e.g. "es"
   app    String? // sub-app the event happened in — the owner can switch mid-visit
   // Per-event metadata — the source of truth (an owner can switch restaurant

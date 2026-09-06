@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAdmin } from "../lib/auth-guard";
-import { deleteVisit, getVisitDetail, listSites } from "../lib/visit-queries";
+import { deleteVisit, getVisitDetail, listSites, markVisitSeen } from "../lib/visit-queries";
 import { madridBoundsFromKey } from "../lib/madrid";
 import {
   renderVisitDeletePage,
@@ -35,6 +35,8 @@ export async function visitDetailRoutes(fastify: FastifyInstance): Promise<void>
       return reply.send(renderVisitNotFoundPage(sites, dayKey, request.url));
     }
     const site = sites.find((s) => s.id === detail.visit.siteId) ?? null;
+    // Opening a session counts as seeing its events (same rule as the list).
+    await markVisitSeen(detail.visit.id);
     return reply.send(renderVisitDetailPage(detail.visit, detail.events, site, sites, dayKey, request.url));
   });
 
