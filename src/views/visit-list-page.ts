@@ -23,6 +23,8 @@ export interface VisitListPageData {
   isToday: boolean;
   summary: DaySummary;
   live: number;
+  /** Current request URL — the topbar's refresh icon links here to reload. */
+  refreshHref: string;
 }
 
 export function renderNoSitesPage(): string {
@@ -157,7 +159,7 @@ function renderTable(items: VisitListItem[], dayKey: string): string {
 }
 
 export function renderVisitListPage(data: VisitListPageData): string {
-  const body = `${renderTopbar(data.sites, data.currentSite.id, data.dayKey)}
+  const body = `${renderTopbar(data.sites, data.currentSite.id, data.dayKey, data.refreshHref)}
 <main class="dashboard">
   ${renderDayNav(data)}
   ${renderSummary(data.summary, data.live, data.isToday)}

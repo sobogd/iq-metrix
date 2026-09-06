@@ -10,12 +10,14 @@ export function escapeHtml(input: string): string {
 }
 
 /** Shared page header: logo emoji only (no title text), then the site
- *  selector (options are the site ids — iq-rest, iq-translate, …), then
- *  sign-out — all on one row, even on a phone. The selector is a native
- *  <select> whose options are self-navigating URLs; the inline onchange is
- *  the app's only client JS. When a Madrid day is selected in the list
- *  header (`dayKey`), switching site keeps that day. */
-export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: string): string {
+ *  selector (options are the site ids — iq-rest, iq-translate, …), then two
+ *  icon buttons on the right — sign-out (a POST form — state changes stay
+ *  form posts in this app) and refresh (a plain link to the current request
+ *  URL, which is what makes it reload — no JS needed). The selector is a
+ *  native <select> whose options are self-navigating URLs; the inline
+ *  onchange is the app's only client JS. When a Madrid day is selected in
+ *  the list header (`dayKey`), switching site keeps that day. */
+export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: string, refreshHref = "/"): string {
   const day = dayKey ? `&day=${escapeHtml(dayKey)}` : "";
   const options = sites
     .map(
@@ -32,7 +34,10 @@ export function renderTopbar(sites: Site[], currentSiteId?: string, dayKey?: str
   <div class="topbar-inner">
     <a class="logo" href="/" aria-label="iq-metrix">📊</a>
     ${select}
-    <form method="post" action="/logout"><button type="submit" class="link">Sign out</button></form>
+    <div class="topbar-actions">
+      <form method="post" action="/logout"><button type="submit" class="icon-btn" title="Sign out" aria-label="Sign out">🚪</button></form>
+      <a class="icon-btn" href="${escapeHtml(refreshHref)}" title="Refresh" aria-label="Refresh">🔄</a>
+    </div>
   </div>
 </header>`;
 }

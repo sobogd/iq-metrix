@@ -182,7 +182,9 @@ Server-rendered HTML, mobile-first. A sticky topbar holds everything on one
 row even on a phone: a logo emoji (📊, no title text), a native `<select>`
 site picker listing each site by its id (iq-rest / iq-translate /
 iq-mermaid) and navigating via its one inline `onchange` (each site is its
-own page via `?site=`), and sign-out.
+own page via `?site=`), and two icon buttons on the right — sign-out (🚪, a
+form POST) and refresh (🔄, a plain link to the current request URL — no JS
+needed for the reload).
 
 The dashboard is deliberately chart-free, filter-free and ranking-free —
 one **Madrid calendar day per page**, chosen by the date navigator above the

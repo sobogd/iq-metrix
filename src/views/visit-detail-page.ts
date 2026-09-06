@@ -32,9 +32,9 @@ function dayQuery(dayKey?: string): string {
   return dayKey ? `&day=${escapeHtml(dayKey)}` : "";
 }
 
-export function renderVisitNotFoundPage(sites: Site[], dayKey?: string): string {
+export function renderVisitNotFoundPage(sites: Site[], dayKey?: string, refreshHref?: string): string {
   const back = dayKey ? `/?day=${escapeHtml(dayKey)}` : "/";
-  const body = `${renderTopbar(sites)}<main class="placeholder">
+  const body = `${renderTopbar(sites, undefined, dayKey, refreshHref)}<main class="placeholder">
     <p>⚠️ Visit not found.</p>
     <p><a href="${back}">← Back to visits</a></p>
   </main>`;
@@ -196,10 +196,11 @@ export function renderVisitDetailPage(
   site: Site | null,
   sites: Site[],
   dayKey?: string,
+  refreshHref?: string,
 ): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
 
-  const body = `${renderTopbar(sites, visit.siteId, dayKey)}
+  const body = `${renderTopbar(sites, visit.siteId, dayKey, refreshHref)}
 <main class="dashboard">
   <p class="crumb"><a href="/?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to visits</a></p>
   ${renderSessionHead(visit, events.length, renderMetaBlock(visit, registry))}
@@ -230,10 +231,11 @@ export function renderVisitDeletePage(
   site: Site | null,
   sites: Site[],
   dayKey?: string,
+  refreshHref?: string,
 ): string {
   const registry = asMetaKeysRegistry(site?.metaKeys);
   const plural = eventsCount === 1 ? "event" : "events";
-  const body = `${renderTopbar(sites, visit.siteId, dayKey)}
+  const body = `${renderTopbar(sites, visit.siteId, dayKey, refreshHref)}
 <main class="dashboard">
   <p class="crumb"><a href="/visits/${escapeHtml(visit.id)}?site=${escapeHtml(visit.siteId)}${dayQuery(dayKey)}">← Back to session</a></p>
   ${renderSessionHead(visit, eventsCount, renderMetaBlock(visit, registry))}

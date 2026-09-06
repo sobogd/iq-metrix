@@ -96,7 +96,41 @@ a {
 
 .topbar-inner form {
   flex: 0 0 auto;
+  margin: 0;
+}
+
+/* Right-side icon buttons — sign-out (a form POST) and refresh (a plain
+   link to the current URL). Square, transparent, borderless until hover. */
+.topbar-actions {
+  flex: 0 0 auto;
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+button.icon-btn:hover,
+a.icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  filter: none;
 }
 
 /* ---------- Buttons / links-as-buttons ---------- */

@@ -58,6 +58,7 @@ export async function homeRoutes(fastify: FastifyInstance): Promise<void> {
         isToday,
         summary,
         live,
+        refreshHref: request.url,
       }),
     );
   });

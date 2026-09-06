@@ -32,10 +32,10 @@ export async function visitDetailRoutes(fastify: FastifyInstance): Promise<void>
     const [sites, detail] = await Promise.all([listSites(), getVisitDetail(request.params.id)]);
     if (!detail) {
       reply.code(404);
-      return reply.send(renderVisitNotFoundPage(sites, dayKey));
+      return reply.send(renderVisitNotFoundPage(sites, dayKey, request.url));
     }
     const site = sites.find((s) => s.id === detail.visit.siteId) ?? null;
-    return reply.send(renderVisitDetailPage(detail.visit, detail.events, site, sites, dayKey));
+    return reply.send(renderVisitDetailPage(detail.visit, detail.events, site, sites, dayKey, request.url));
   });
 
   // Delete-confirm page. A plain GET that changes nothing — it re-renders the
@@ -52,10 +52,10 @@ export async function visitDetailRoutes(fastify: FastifyInstance): Promise<void>
     const [sites, detail] = await Promise.all([listSites(), getVisitDetail(request.params.id)]);
     if (!detail) {
       reply.code(404);
-      return reply.send(renderVisitNotFoundPage(sites, dayKey));
+      return reply.send(renderVisitNotFoundPage(sites, dayKey, request.url));
     }
     const site = sites.find((s) => s.id === detail.visit.siteId) ?? null;
-    return reply.send(renderVisitDeletePage(detail.visit, detail.events.length, site, sites, dayKey));
+    return reply.send(renderVisitDeletePage(detail.visit, detail.events.length, site, sites, dayKey, request.url));
   });
 
   // POST, never a GET link — deleting is a state change, and this app's rule
