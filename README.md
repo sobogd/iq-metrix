@@ -218,10 +218,10 @@ readable line (`Search engine · Google`, `Search engine · Google (IP
 verified)`, `AI crawler · OpenAI GPTBot`, `Bot · no browser markers`, `Link
 preview · X (Twitter)`, …) in muted text above the address, shown only for
 non-human traffic; the third line is the
-**entry address** — where the
-session opened, as the concrete pathname in the page/path purple (`/`,
-`/ru/feature-slug`; the coarse page label for sessions recorded before path
-capture); the fourth line is dot-separated (`·`) colored text — last-activity
+**entry address** — where the session opened, as the concrete pathname in the
+page/path purple (`/`, `/ru/feature-slug`) — it appears only when the visit
+recorded a pathname, so sessions ingested before path capture get no address
+line at all; the fourth line is dot-separated (`·`) colored text — last-activity
 time as `HH:MM` only (the selected day lives in the header, so no date is
 shown), the event count as the bare number, then the source (`via
 <referrer>` or `from <campaign>`, green), OS (Windows/macOS/iOS/Android —

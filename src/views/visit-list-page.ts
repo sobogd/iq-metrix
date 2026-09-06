@@ -107,8 +107,9 @@ function renderSummary(s: DaySummary): string {
 //           readable line, "Search engine · Google (IP verified)") in muted
 //           text — humans get no line at all.
 //   line 3: the ENTRY ADDRESS in the page/path purple — where the session
-//           opened ("/", "/ru/feature-slug"; the coarse page label for
-//           pre-path sessions), one truncated line.
+//           opened ("/", "/ru/feature-slug"), one truncated line. Only shown
+//           when the visit recorded a pathname — sessions from before path
+//           capture get no address line at all (no bare type labels).
 //   line 4: everything else as dot-separated text, each value keeping its
 //           chip color: last-activity HH:MM (the day lives in the header
 //           navigator), the event count, via/from source, OS, "Tablet",

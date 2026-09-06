@@ -47,11 +47,11 @@ export interface VisitListItem {
   eventCount: number;
   /** Distinct pages visited (lateral aggregate below). */
   pageCount: number;
-  /** First page of the visit — its concrete pathname ("/", "/ru/feature-slug")
-   *  when the events carry one, else the coarse `page` label (events ingested
-   *  before path capture). Rendered as the row's entry-page chip. */
+  /** First page of the visit — its concrete pathname ("/", "/ru/feature-slug").
+   *  Null when the visit predates path capture (or was server-fired without a
+   *  page): the list then shows no address line rather than a bare type. */
   firstPage: string | null;
-  /** Last page of the visit, in the same path ?? label form. */
+  /** Last page of the visit, as its pathname — null for pre-path sessions. */
   lastPage: string | null;
   /** True when the session saw an event within the last ~30 minutes — it is
    *  still "live" and the list highlights the row with a green border. */
@@ -82,8 +82,8 @@ export async function listVisits(siteId: string, start: Date, end: Date, now: Da
     LEFT JOIN LATERAL (
       SELECT count(*)::int AS "eventCount",
              count(DISTINCT "page")::int AS "pageCount",
-             (array_agg(coalesce("path", "page") ORDER BY at ASC))[1] AS "firstPage",
-             (array_agg(coalesce("path", "page") ORDER BY at DESC))[1] AS "lastPage"
+             (array_agg("path" ORDER BY at ASC))[1] AS "firstPage",
+             (array_agg("path" ORDER BY at DESC))[1] AS "lastPage"
       FROM "Event"
       WHERE "visitId" = v.id
     ) e ON true
